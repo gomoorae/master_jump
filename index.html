@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>정수협객: 도검 산림 (하강 핑퐁 루프)</title>
+    <style>
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        canvas { background: #000; border: 5px solid #2e7d32; max-width: 95vw; max-height: 95vh; object-fit: contain; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 1600;
+        canvas.height = 900;
+
+        const imgs = {
+            run: new Image(), rising: new Image(), falling: new Image(),
+            bgFar: new Image(), bgNear: new Image()
+        };
+        imgs.run.src = 'assets/run_sheet.png';
+        imgs.rising.src = 'assets/rising_sheet.png';
+        imgs.falling.src = 'assets/falling_sheet.png';
+        imgs.bgFar.src = 'assets/bg_far.png';
+        imgs.bgNear.src = 'assets/bg_near.png';
+
+        const player = {
+            x: 300, y: 0, width: 125, height: 125,
+            vy: 0, gravity: 0.4, thrust: -0.9, isPressing: false,
+            state: 'RUN',
+            currentFrame: 0,
+            totalFrames: 6,
+            frameWidth: 256,
+            frameHeight: 256,
+            tickCount: 0,
+            ticksPerFrame: 5,
+            // [추가됨] 애니메이션 재생 방향 (1: 정방향, -1: 역방향)
+            animDir: 1 
+        };
+
+        const background = { farX: 0, farSpeed: 1, nearX: 0, nearSpeed: 4 };
+
+        window.addEventListener('mousedown', () => player.isPressing = true);
+        window.addEventListener('mouseup', () => player.isPressing = false);
+
+        function update() {
+            background.farX -= background.farSpeed; if (background.farX <= -canvas.width) background.farX = 0;
+            background.nearX -= background.nearSpeed; if (background.nearX <= -canvas.width) background.nearX = 0;
+
+            if (player.isPressing) player.vy += player.thrust;
+            player.vy += player.gravity;
+            player.y += player.vy;
+
+            const groundY = canvas.height - player.height - 50; 
+            let newState = 'RUN';
+
+            if (player.y >= groundY) {
+                player.y = groundY; player.vy = 0; newState = 'RUN';
+            } else {
+                newState = (player.vy < 0) ? 'RISING' : 'FALLING';
+            }
+
+            if (player.state !== newState) {
+                player.state = newState;
+                player.currentFrame = 0;
+                player.tickCount = 0;
+                player.animDir = 1; // [중요] 상태가 바뀌면 항상 정방향 재생으로 초기화!
+            }
+
+            player.tickCount++;
+            if (player.tickCount > player.ticksPerFrame) {
+                player.tickCount = 0;
+
+                if (player.state === 'RISING') {
+                    // 상승: 마지막 프레임 멈춤 (Clamping)
+                    if (player.currentFrame < player.totalFrames - 1) player.currentFrame++;
+                } 
+                else if (player.state === 'FALLING') {
+                    // [핵심 변경] 하강: 핑퐁 루프 (Ping-Pong)
+                    player.currentFrame += player.animDir;
+
+                    // 끝에 도달하면 방향 반대로
+                    if (player.currentFrame >= player.totalFrames - 1) {
+                        player.currentFrame = player.totalFrames - 1;
+                        player.animDir = -1; // 역방향 전환
+                    }
+                    // 처음으로 돌아오면 다시 정방향으로
+                    if (player.currentFrame <= 0) {
+                        player.currentFrame = 0;
+                        player.animDir = 1; // 정방향 전환
+                    }
+                }
+                else {
+                    // 달리기: 무한 반복 (Loop)
+                    player.currentFrame = (player.currentFrame + 1) % player.totalFrames;
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(imgs.bgFar, background.farX, 0, canvas.width, canvas.height);
+            ctx.drawImage(imgs.bgFar, background.farX + canvas.width, 0, canvas.width, canvas.height);
+            ctx.drawImage(imgs.bgNear, background.nearX, 0, canvas.width, canvas.height);
+            ctx.drawImage(imgs.bgNear, background.nearX + canvas.width, 0, canvas.width, canvas.height);
+
+            let currentSheet = imgs.run;
+            if (player.state === 'RISING') currentSheet = imgs.rising;
+            if (player.state === 'FALLING') currentSheet = imgs.falling;
+
+            const sx = player.currentFrame * player.frameWidth;
+
+            if (currentSheet.complete) {
+                ctx.drawImage(currentSheet, sx, 0, player.frameWidth, player.frameHeight, player.x, player.y, player.width, player.height);
+            }
+
+            ctx.fillStyle = "white"; ctx.font = "20px Arial";
+            // 현재 방향도 같이 출력해서 디버깅!
+            ctx.fillText(`State: ${player.state} | Frame: ${player.currentFrame} | Dir: ${player.animDir}`, player.x, player.y - 20);
+
+            update();
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+</html>
