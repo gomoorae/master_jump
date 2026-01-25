@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>정수협객: 도검 산림 (하강 핑퐁 루프)</title>
+    <title>정수협객: 도검 산림 (물리 동기화 디테일)</title>
     <style>
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         canvas { background: #000; border: 5px solid #2e7d32; max-width: 95vw; max-height: 95vh; object-fit: contain; }
@@ -19,30 +19,38 @@
 
         const imgs = {
             run: new Image(), rising: new Image(), falling: new Image(),
-            bgFar: new Image(), bgNear: new Image()
+            jumpEff: new Image(), bgFar: new Image(), bgNear: new Image()
         };
         imgs.run.src = 'assets/run_sheet.png';
         imgs.rising.src = 'assets/rising_sheet.png';
         imgs.falling.src = 'assets/falling_sheet.png';
+        imgs.jumpEff.src = 'assets/jump_effect_sheet.png'; 
         imgs.bgFar.src = 'assets/bg_far.png';
         imgs.bgNear.src = 'assets/bg_near.png';
 
         const player = {
-            x: 300, y: 0, width: 125, height: 125,
-            vy: 0, gravity: 0.4, thrust: -0.9, isPressing: false,
-            state: 'RUN',
-            currentFrame: 0,
-            totalFrames: 6,
-            frameWidth: 256,
-            frameHeight: 256,
-            tickCount: 0,
-            ticksPerFrame: 5,
-            // [추가됨] 애니메이션 재생 방향 (1: 정방향, -1: 역방향)
-            animDir: 1 
+            x: 350, y: 0, width: 125, height: 125,
+            vy: 0, gravity: 0.4, thrust: -1.2, isPressing: false,
+            state: 'RUN', currentFrame: 0, totalFrames: 6,
+            frameWidth: 256, frameHeight: 256,
+            tickCount: 0, ticksPerFrame: 6, animDir: 1
         };
 
+        let jumpEffects = [];
         const background = { farX: 0, farSpeed: 1, nearX: 0, nearSpeed: 4 };
 
+        function createJumpEffect(px, py, pw, ph) {
+            const effSize = 130; 
+            jumpEffects.push({
+                x: px + (pw / 2) - (effSize / 2), 
+                y: py + ph - (effSize / 2) - 15, // 위치 미세조정 포인트
+                size: effSize,
+                currentFrame: 0, totalFrames: 6,
+                tickCount: 0, ticksPerFrame: 3
+            });
+        }
+
+        // [변경] 마우스 클릭 시에는 이펙트를 만들지 않고 '상태'만 변경함
         window.addEventListener('mousedown', () => player.isPressing = true);
         window.addEventListener('mouseup', () => player.isPressing = false);
 
@@ -63,39 +71,41 @@
                 newState = (player.vy < 0) ? 'RISING' : 'FALLING';
             }
 
+            // [핵심] 상태 전이 포착 (State Transition)
+            // 예전 상태가 RISING이 아니었는데, 지금 RISING이 되었다면? = "실제로 솟구치기 시작한 순간!"
             if (player.state !== newState) {
+                if (newState === 'RISING') {
+                    createJumpEffect(player.x, player.y, player.width, player.height);
+                }
                 player.state = newState;
                 player.currentFrame = 0;
                 player.tickCount = 0;
-                player.animDir = 1; // [중요] 상태가 바뀌면 항상 정방향 재생으로 초기화!
+                player.animDir = 1;
             }
 
+            // 애니메이션 업데이트 (캐릭터)
             player.tickCount++;
             if (player.tickCount > player.ticksPerFrame) {
                 player.tickCount = 0;
-
                 if (player.state === 'RISING') {
-                    // 상승: 마지막 프레임 멈춤 (Clamping)
                     if (player.currentFrame < player.totalFrames - 1) player.currentFrame++;
-                } 
-                else if (player.state === 'FALLING') {
-                    // [핵심 변경] 하강: 핑퐁 루프 (Ping-Pong)
+                } else if (player.state === 'FALLING') {
                     player.currentFrame += player.animDir;
-
-                    // 끝에 도달하면 방향 반대로
-                    if (player.currentFrame >= player.totalFrames - 1) {
-                        player.currentFrame = player.totalFrames - 1;
-                        player.animDir = -1; // 역방향 전환
-                    }
-                    // 처음으로 돌아오면 다시 정방향으로
-                    if (player.currentFrame <= 0) {
-                        player.currentFrame = 0;
-                        player.animDir = 1; // 정방향 전환
-                    }
-                }
-                else {
-                    // 달리기: 무한 반복 (Loop)
+                    if (player.currentFrame >= player.totalFrames - 1) { player.currentFrame = player.totalFrames - 1; player.animDir = -1; }
+                    if (player.currentFrame <= 0) { player.currentFrame = 0; player.animDir = 1; }
+                } else {
                     player.currentFrame = (player.currentFrame + 1) % player.totalFrames;
+                }
+            }
+
+            // 애니메이션 업데이트 (이펙트)
+            for (let i = jumpEffects.length - 1; i >= 0; i--) {
+                let eff = jumpEffects[i];
+                eff.tickCount++;
+                if (eff.tickCount > eff.ticksPerFrame) {
+                    eff.tickCount = 0;
+                    eff.currentFrame++;
+                    if (eff.currentFrame >= eff.totalFrames) jumpEffects.splice(i, 1);
                 }
             }
         }
@@ -107,19 +117,16 @@
             ctx.drawImage(imgs.bgNear, background.nearX, 0, canvas.width, canvas.height);
             ctx.drawImage(imgs.bgNear, background.nearX + canvas.width, 0, canvas.width, canvas.height);
 
-            let currentSheet = imgs.run;
-            if (player.state === 'RISING') currentSheet = imgs.rising;
-            if (player.state === 'FALLING') currentSheet = imgs.falling;
+            jumpEffects.forEach(eff => {
+                if (imgs.jumpEff.complete) {
+                    ctx.drawImage(imgs.jumpEff, eff.currentFrame * 256, 0, 256, 256, eff.x, eff.y, eff.size, eff.size);
+                }
+            });
 
-            const sx = player.currentFrame * player.frameWidth;
-
+            let currentSheet = (player.state === 'RISING') ? imgs.rising : (player.state === 'FALLING' ? imgs.falling : imgs.run);
             if (currentSheet.complete) {
-                ctx.drawImage(currentSheet, sx, 0, player.frameWidth, player.frameHeight, player.x, player.y, player.width, player.height);
+                ctx.drawImage(currentSheet, player.currentFrame * player.frameWidth, 0, player.frameWidth, player.frameHeight, player.x, player.y, player.width, player.height);
             }
-
-            ctx.fillStyle = "white"; ctx.font = "20px Arial";
-            // 현재 방향도 같이 출력해서 디버깅!
-            ctx.fillText(`State: ${player.state} | Frame: ${player.currentFrame} | Dir: ${player.animDir}`, player.x, player.y - 20);
 
             update();
             requestAnimationFrame(draw);
