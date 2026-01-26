@@ -2,10 +2,10 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>정수협객: 도검 산림 (물리 동기화 디테일)</title>
+    <title>정수협객: 히트박스 테스트</title>
     <style>
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        canvas { background: #000; border: 5px solid #2e7d32; max-width: 95vw; max-height: 95vh; object-fit: contain; }
+        canvas { background: #0a0a0a; border: 5px solid #5d4037; max-width: 95vw; max-height: 95vh; object-fit: contain; }
     </style>
 </head>
 <body>
@@ -17,115 +17,187 @@
         canvas.width = 1600;
         canvas.height = 900;
 
+        // =========================================
+        // 1. 에셋 로딩 (정수가 새로 만든 파일들!)
+        // =========================================
         const imgs = {
             run: new Image(), rising: new Image(), falling: new Image(),
-            jumpEff: new Image(), bgFar: new Image(), bgNear: new Image()
+            jumpEff: new Image(), bgFar: new Image(), bgNear: new Image(),
+            obs: new Image() // 장애물 이미지(없으면 빨간공)
         };
+        // 파일명이 같다면 그대로 두면 돼. 다르다면 수정해줘!
         imgs.run.src = 'assets/run_sheet.png';
         imgs.rising.src = 'assets/rising_sheet.png';
         imgs.falling.src = 'assets/falling_sheet.png';
         imgs.jumpEff.src = 'assets/jump_effect_sheet.png'; 
         imgs.bgFar.src = 'assets/bg_far.png';
         imgs.bgNear.src = 'assets/bg_near.png';
+        imgs.obs.src = 'assets/projectile.png';
+
+        // =========================================
+        // 2. 게임 변수 설정
+        // =========================================
+        // ★ [디버그 모드 스위치] 이걸 false로 바꾸면 히트박스가 안 보여!
+        const DEBUG_MODE = true; 
 
         const player = {
-            x: 350, y: 0, width: 125, height: 125,
+            x: 350, y: 0, width: 125, height: 125, // 캐릭터 히트박스 크기
             vy: 0, gravity: 0.4, thrust: -1.2, isPressing: false,
             state: 'RUN', currentFrame: 0, totalFrames: 6,
-            frameWidth: 256, frameHeight: 256,
+            frameWidth: 256, frameHeight: 256, // 스프라이트 원본 크기
             tickCount: 0, ticksPerFrame: 6, animDir: 1
         };
 
         let jumpEffects = [];
+        let obstacles = []; // 장애물 배열
         const background = { farX: 0, farSpeed: 1, nearX: 0, nearSpeed: 4 };
+        let frameCount = 0;
 
+        // =========================================
+        // 3. 함수 정의 (이펙트, 장애물 생성)
+        // =========================================
         function createJumpEffect(px, py, pw, ph) {
             const effSize = 130; 
             jumpEffects.push({
                 x: px + (pw / 2) - (effSize / 2), 
-                y: py + ph - (effSize / 2) - 15, // 위치 미세조정 포인트
+                y: py + ph - (effSize / 2) - 15, 
                 size: effSize,
                 currentFrame: 0, totalFrames: 6,
                 tickCount: 0, ticksPerFrame: 3
             });
         }
 
-        // [변경] 마우스 클릭 시에는 이펙트를 만들지 않고 '상태'만 변경함
+        // 장애물 생성 함수 (약 1초에 한 번씩 시도)
+        function spawnObstacle() {
+            if (Math.random() < 0.02) { 
+                const size = 40 + Math.random() * 20; // 크기 랜덤 (40~60)
+                obstacles.push({
+                    x: canvas.width, // 화면 오른쪽 끝에서 시작
+                    y: Math.random() * (canvas.height - size - 100), // 바닥 제외 랜덤 높이
+                    size: size,
+                    speed: 8 + Math.random() * 5, // 속도 랜덤
+                    isColliding: false // 충돌 확인용 플래그
+                });
+            }
+        }
+
+        // =========================================
+        // 4. 입력 및 업데이트 루프
+        // =========================================
         window.addEventListener('mousedown', () => player.isPressing = true);
         window.addEventListener('mouseup', () => player.isPressing = false);
 
         function update() {
+            frameCount++;
             background.farX -= background.farSpeed; if (background.farX <= -canvas.width) background.farX = 0;
             background.nearX -= background.nearSpeed; if (background.nearX <= -canvas.width) background.nearX = 0;
 
+            // --- 플레이어 물리 & 상태 ---
             if (player.isPressing) player.vy += player.thrust;
             player.vy += player.gravity;
             player.y += player.vy;
 
             const groundY = canvas.height - player.height - 50; 
             let newState = 'RUN';
+            if (player.y >= groundY) { player.y = groundY; player.vy = 0; newState = 'RUN'; }
+            else { newState = (player.vy < 0) ? 'RISING' : 'FALLING'; }
 
-            if (player.y >= groundY) {
-                player.y = groundY; player.vy = 0; newState = 'RUN';
-            } else {
-                newState = (player.vy < 0) ? 'RISING' : 'FALLING';
-            }
-
-            // [핵심] 상태 전이 포착 (State Transition)
-            // 예전 상태가 RISING이 아니었는데, 지금 RISING이 되었다면? = "실제로 솟구치기 시작한 순간!"
             if (player.state !== newState) {
-                if (newState === 'RISING') {
-                    createJumpEffect(player.x, player.y, player.width, player.height);
-                }
-                player.state = newState;
-                player.currentFrame = 0;
-                player.tickCount = 0;
-                player.animDir = 1;
+                if (newState === 'RISING') createJumpEffect(player.x, player.y, player.width, player.height);
+                player.state = newState; player.currentFrame = 0; player.tickCount = 0; player.animDir = 1;
             }
 
-            // 애니메이션 업데이트 (캐릭터)
+            // --- 애니메이션 업데이트 ---
             player.tickCount++;
             if (player.tickCount > player.ticksPerFrame) {
                 player.tickCount = 0;
-                if (player.state === 'RISING') {
-                    if (player.currentFrame < player.totalFrames - 1) player.currentFrame++;
-                } else if (player.state === 'FALLING') {
+                if (player.state === 'RISING') { if (player.currentFrame < player.totalFrames - 1) player.currentFrame++; }
+                else if (player.state === 'FALLING') {
                     player.currentFrame += player.animDir;
                     if (player.currentFrame >= player.totalFrames - 1) { player.currentFrame = player.totalFrames - 1; player.animDir = -1; }
                     if (player.currentFrame <= 0) { player.currentFrame = 0; player.animDir = 1; }
-                } else {
-                    player.currentFrame = (player.currentFrame + 1) % player.totalFrames;
-                }
+                } else { player.currentFrame = (player.currentFrame + 1) % player.totalFrames; }
             }
 
-            // 애니메이션 업데이트 (이펙트)
             for (let i = jumpEffects.length - 1; i >= 0; i--) {
                 let eff = jumpEffects[i];
                 eff.tickCount++;
                 if (eff.tickCount > eff.ticksPerFrame) {
-                    eff.tickCount = 0;
-                    eff.currentFrame++;
+                    eff.tickCount = 0; eff.currentFrame++;
                     if (eff.currentFrame >= eff.totalFrames) jumpEffects.splice(i, 1);
                 }
             }
+
+            // --- 장애물 업데이트 및 충돌 검사 ---
+            spawnObstacle();
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.x -= obs.speed;
+                
+                // [충돌 검사 핵심 로직] AABB(사각형) 충돌 방식
+                if (player.x < obs.x + obs.size &&
+                    player.x + player.width > obs.x &&
+                    player.y < obs.y + obs.size &&
+                    player.y + player.height > obs.y) {
+                    // 충돌 발생!
+                    obs.isColliding = true; 
+                    // 나중엔 여기서 HP를 깎거나 게임오버 처리를 할 거야.
+                } else {
+                    obs.isColliding = false;
+                }
+
+                if (obs.x + obs.size < 0) obstacles.splice(i, 1); // 화면 밖으로 나가면 삭제
+            }
         }
 
+        // =========================================
+        // 5. 그리기 루프
+        // =========================================
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(imgs.bgFar, background.farX, 0, canvas.width, canvas.height);
-            ctx.drawImage(imgs.bgFar, background.farX + canvas.width, 0, canvas.width, canvas.height);
-            ctx.drawImage(imgs.bgNear, background.nearX, 0, canvas.width, canvas.height);
-            ctx.drawImage(imgs.bgNear, background.nearX + canvas.width, 0, canvas.width, canvas.height);
+            ctx.drawImage(imgs.bgFar, background.farX, 0, canvas.width, canvas.height); ctx.drawImage(imgs.bgFar, background.farX + canvas.width, 0, canvas.width, canvas.height);
+            ctx.drawImage(imgs.bgNear, background.nearX, 0, canvas.width, canvas.height); ctx.drawImage(imgs.bgNear, background.nearX + canvas.width, 0, canvas.width, canvas.height);
 
+            // 이펙트 그리기
             jumpEffects.forEach(eff => {
-                if (imgs.jumpEff.complete) {
-                    ctx.drawImage(imgs.jumpEff, eff.currentFrame * 256, 0, 256, 256, eff.x, eff.y, eff.size, eff.size);
+                if (imgs.jumpEff.complete) ctx.drawImage(imgs.jumpEff, eff.currentFrame * 256, 0, 256, 256, eff.x, eff.y, eff.size, eff.size);
+            });
+
+            // 장애물 그리기
+            obstacles.forEach(obs => {
+                if (imgs.obs.complete && imgs.obs.width > 0) {
+                    ctx.drawImage(imgs.obs, obs.x, obs.y, obs.size, obs.size);
+                } else {
+                    // 이미지 없으면 빨간 원으로 대체
+                    ctx.fillStyle = obs.isColliding ? "#ff0000" : "#b71c1c"; 
+                    ctx.beginPath(); ctx.arc(obs.x + obs.size/2, obs.y + obs.size/2, obs.size/2, 0, Math.PI*2); ctx.fill();
                 }
             });
 
+            // 캐릭터 그리기
             let currentSheet = (player.state === 'RISING') ? imgs.rising : (player.state === 'FALLING' ? imgs.falling : imgs.run);
             if (currentSheet.complete) {
                 ctx.drawImage(currentSheet, player.currentFrame * player.frameWidth, 0, player.frameWidth, player.frameHeight, player.x, player.y, player.width, player.height);
+            }
+
+            // ★★★ [디버그: 히트박스 그리기] ★★★
+            if (DEBUG_MODE) {
+                ctx.lineWidth = 2;
+                
+                // 플레이어 히트박스 (노란색)
+                ctx.strokeStyle = "yellow";
+                ctx.strokeRect(player.x, player.y, player.width, player.height);
+
+                // 장애물 히트박스 (평소 빨강, 충돌 시 라임색)
+                obstacles.forEach(obs => {
+                    ctx.strokeStyle = obs.isColliding ? "lime" : "red";
+                    if (obs.isColliding) ctx.lineWidth = 4; // 충돌하면 두껍게!
+                    ctx.strokeRect(obs.x, obs.y, obs.size, obs.size);
+                    ctx.lineWidth = 2; // 다시 원래대로
+                });
+
+                // 가이드 텍스트
+                ctx.fillStyle = "white"; ctx.font = "20px Arial"; ctx.fillText("DEBUG MODE: ON (노란박스: 플레이어 / 빨간박스: 장애물)", 20, 30);
             }
 
             update();
