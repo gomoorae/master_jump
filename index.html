@@ -45,12 +45,12 @@
         const player = {
             x: 350, y: 100,
             drawWidth: 125, drawHeight: 125,
-            hitboxWidth: 60, hitboxHeight: 100,
-            hitboxOffsetX: 32.5, hitboxOffsetY: 12.5,
+            hitboxWidth: 50, hitboxHeight: 90,
+            hitboxOffsetX: 25, hitboxOffsetY: 15,
             vy: 0, gravity: 0.4, thrust: -1.2, isPressing: false,
             state: 'FALLING', currentFrame: 0, totalFrames: 6,
             frameWidth: 256, frameHeight: 256,
-            tickCount: 0, ticksPerFrame: 6, animDir: 1
+            tickCount: 0, ticksPerFrame: 5, animDir: 1
         };
 
         let jumpEffects = [];
@@ -60,9 +60,9 @@
         function createJumpEffect(px, py, pw, ph) {
             const effSize = 130; 
             jumpEffects.push({
-                x: px + (pw / 2) - (effSize / 2), 
-                y: py + ph - (effSize / 2) - 15, 
-                size: effSize, currentFrame: 0, totalFrames: 6, tickCount: 0, ticksPerFrame: 4
+                x: px + (pw / 2) - (effSize / 2) - 15, 
+                y: py + ph - (effSize / 2) - 19, 
+                size: effSize, currentFrame: 0, totalFrames: 6, tickCount: 0, ticksPerFrame: 3
             });
         }
 
