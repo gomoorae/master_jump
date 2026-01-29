@@ -2,10 +2,10 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>정수협객: 도검 산림 (시인성 강화 버전)</title>
+    <title>정수협객: 도검 산림 (화면 흔들림 업데이트)</title>
     <style>
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        canvas { background: #0a0a0a; border: 5px solid #5d4037; box-shadow: 0 0 20px rgba(0,255,0,0.2); }
+        canvas { background: #0a0a0a; border: 5px solid #5d4037; box-shadow: 0 0 20px rgba(0,255,0,0.2); cursor: pointer; }
     </style>
 </head>
 <body>
@@ -17,7 +17,7 @@
         canvas.width = 1600;
         canvas.height = 900;
 
-        // 1. 에셋 로딩
+        // 1. 에셋 로딩 (v1.7 유지)
         const imgs = {
             rising: new Image(), falling: new Image(), jumpEff: new Image(),
             trap: new Image(), deflect: new Image(), hitEff: new Image(),
@@ -37,8 +37,12 @@
         imgs.wall.src = 'assets/bg_wall.png'; 
         imgs.ceiling.src = 'assets/bg_ceiling.png';
 
-        // 2. 환경 및 물리 수치
-        const DEBUG_MODE = false; // ★ 히트박스 표시 끔!
+        const bgm = new Audio('assets/bgm.mp3');
+        bgm.loop = true;
+        let isMuted = false;
+
+        // 2. 환경 및 물리 수치 (v1.7 유지)
+        const DEBUG_MODE = false; 
         const TRAP_HEIGHT = 80;
         const TRAP_SPEED = 6;
         const OBSTACLE_GRAVITY = 0.8; 
@@ -56,12 +60,18 @@
             vy: 0, gravity: 0.4, thrust: -1.2, isPressing: false,
             state: 'FALLING', currentFrame: 0, tickCount: 0, ticksPerFrame: 5,
             animDir: 1,
-            frames: { RISING: 6, FALLING: 6, DEFLECT: 3 }
+            frames: { RISING: 6, FALLING: 6, DEFLECT: 3 },
+            ceilingStunTimer: 0 
         };
 
-        let jumpEffects = []; let hitEffects = []; let obstacles = [];
-        let obstacleTrails = []; // ★ 잔상 파티클 배열 추가
+        // ★ [신규] 화면 흔들림 변수
+        let shakeAmount = 0; 
 
+        const muteBtn = { x: 50, y: 800, size: 60 };
+        let jumpEffects = []; let hitEffects = []; let obstacles = [];
+        let obstacleTrails = []; let envParticles = [];
+
+        // --- 유틸리티 함수 ---
         function createJumpEffect(px, py, pw, ph) {
             const effSize = 130; 
             jumpEffects.push({ x: px + (pw / 2) - (effSize / 2) - 15, y: py + ph - (effSize / 2) - 19, size: effSize, currentFrame: 0, totalFrames: 6, tickCount: 0, ticksPerFrame: 3 });
@@ -71,24 +81,25 @@
             hitEffects.push({ x: x, y: y - 50, size: 100, currentFrame: 0, totalFrames: 5, tickCount: 0, ticksPerFrame: 2 });
         }
 
-        // ★ [신규] 잔상 파티클 생성 함수
-        function createTrail(x, y, type) {
-            obstacleTrails.push({
-                x: x, y: y,
-                alpha: 0.6,
-                size: Math.random() * 4, // 잔상 크기 조절
-                color: (type === 'SPEAR') ? '#ffffff' : '#aaccff', // 창은 흰색, 검은 하늘색
-                speedX: Math.random() * 2,
-                life: 1.0
-            });
+        function createEnvBurst(x, y, isCeiling) {
+            for (let i = 0; i < 15; i++) {
+                envParticles.push({
+                    x: x, y: y, vx: (Math.random() - 0.5) * 10,
+                    vy: isCeiling ? (Math.random() * 5 + 2) : (Math.random() * -5 - 2), 
+                    size: Math.random() * 4 + 2, color: '#ffffff', life: 1.0, decay: Math.random() * 0.05 + 0.02
+                });
+            }
+            // ★ [수정] 부딪히는 순간 흔들림 수치 대입
+            // 아래 숫자를 높이면 더 격하게 흔들려! (추천: 10 ~ 20)
+            shakeAmount = 15; 
         }
 
-        function deflectObstacle(obs) {
-            if (obs.isDeflected) return;
-            obs.isDeflected = true;
-            obs.vx = 10 + Math.random() * 5;
-            obs.vy = -15 - Math.random() * 5;
-            obs.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (0.6 + Math.random() * 0.4);
+        function createTrail(x, y, type) {
+            obstacleTrails.push({
+                x: x, y: y, alpha: 0.6, size: Math.random() * 4,
+                color: (type === 'SPEAR') ? '#ffffff' : '#aaccff',
+                speedX: Math.random() * 2, life: 1.0
+            });
         }
 
         function spawnObstacle() {
@@ -96,7 +107,6 @@
                 const types = ['AXE', 'SPEAR', 'SWORD'];
                 const selectedType = types[Math.floor(Math.random() * types.length)];
                 let obsData = { x: canvas.width, isColliding: false, angle: 0, isDeflected: false, vx: 0, vy: 0, type: selectedType };
-                
                 switch(selectedType) {
                     case 'AXE':
                         obsData.size = 60; obsData.speed = 7 + Math.random() * 3;
@@ -108,14 +118,29 @@
                         obsData.rotationSpeed = 0; obsData.hitboxW = 70; obsData.hitboxH = 10; obsData.img = imgs.spear; break;
                     case 'SWORD':
                         obsData.size = 70; obsData.speed = 10 + Math.random() * 3;
-                        obsData.y = player.y + (player.drawHeight / 2) - (35); // ★ 조준 사격 유지
+                        obsData.y = player.y + (player.drawHeight / 2) - (35); 
                         obsData.rotationSpeed = 0; obsData.hitboxW = 50; obsData.hitboxH = 15; obsData.img = imgs.sword; break;
                 }
                 obstacles.push(obsData);
             }
         }
 
-        window.addEventListener('mousedown', () => { player.isPressing = true; });
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            if (mouseX >= muteBtn.x && mouseX <= muteBtn.x + muteBtn.size &&
+                mouseY >= muteBtn.y && mouseY <= muteBtn.y + muteBtn.size) {
+                isMuted = !isMuted;
+                if (isMuted) bgm.pause(); else bgm.play();
+                return;
+            }
+            if (player.ceilingStunTimer <= 0) {
+                player.isPressing = true;
+                if (!isMuted) bgm.play().catch(() => {});
+            }
+        });
+
         window.addEventListener('mouseup', () => { player.isPressing = false; });
 
         function update() {
@@ -123,66 +148,60 @@
             background.ceilingX -= background.ceilingSpeed; if (background.ceilingX <= -2560) background.ceilingX = 0;
             background.trapX -= TRAP_SPEED; if (background.trapX <= -canvas.width) background.trapX = 0;
 
+            if (player.ceilingStunTimer > 0) { player.ceilingStunTimer--; player.isPressing = false; }
             if (player.isPressing) player.vy += player.thrust; player.vy += player.gravity; player.y += player.vy;
-            if (player.y < 50) { player.y = 50; player.vy = 0; }
 
-            if (player.y + player.drawHeight > canvas.height - TRAP_HEIGHT && player.vy >= 0) {
-                player.vy = -10; player.state = 'RISING'; player.currentFrame = 0; player.tickCount = 0; player.animDir = 1;
+            // ★ 천장 충돌 로직
+            if (player.y < 40) { 
+                if (player.ceilingStunTimer <= 0) createEnvBurst(player.x + player.drawWidth / 2, 40, true);
+                player.y = 40; 
+                player.vy = 0.5; // 정수's 픽!
+                player.ceilingStunTimer = 10; // 정수's 픽!
+            }
+
+            // ★ 함정 충돌 로직
+            const trapLimit = canvas.height - TRAP_HEIGHT;
+            if (player.y + player.drawHeight > trapLimit && player.vy >= 0) {
+                createEnvBurst(player.x + player.drawWidth / 2, trapLimit, false);
+                player.vy = -10;
+                player.state = 'RISING'; player.currentFrame = 0; player.tickCount = 0; player.animDir = 1;
                 createJumpEffect(player.x, player.y, player.drawWidth, player.drawHeight);
             }
 
             spawnObstacle();
             const phX = player.x + player.hitboxOffsetX; const phY = player.y + player.hitboxOffsetY;
-
             obstacles.forEach((obs) => {
                 if (!obs.isDeflected) {
                     obs.x -= obs.speed;
                     if (obs.type === 'AXE') { obs.y += obs.vy; obs.vy += AXE_GRAVITY; obs.angle -= obs.rotationSpeed; }
-                    
-                    // ★ 창과 검에 파티클 생성
-                    if (obs.type === 'SPEAR' || obs.type === 'SWORD') {
-                        if (Math.random() < 1) createTrail(obs.x + 10, obs.y + obs.size/2, obs.type); // ★ 잔상 생성 확률 조절
-                    }
-
+                    if (obs.type === 'SPEAR' || obs.type === 'SWORD') { if (Math.random() < 1) createTrail(obs.x + 10, obs.y + obs.size/2, obs.type); }
                     const oCX = obs.x + obs.size / 2; const oCY = obs.y + obs.size / 2;
                     const isHit = (phX < oCX + obs.hitboxW/2 && phX + player.hitboxWidth > oCX - obs.hitboxW/2 && phY < oCY + obs.hitboxH/2 && phY + player.hitboxHeight > oCY - obs.hitboxH/2);
-                    if (isHit && player.state !== 'DEFLECT') { deflectObstacle(obs); createHitEffect(oCX, oCY); player.state = 'DEFLECT'; player.currentFrame = 0; player.tickCount = 0; }
-                } else {
-                    obs.x += obs.vx; obs.y += obs.vy; obs.vy += OBSTACLE_GRAVITY; obs.angle += obs.rotationSpeed;
-                }
+                    if (isHit && player.state !== 'DEFLECT') { 
+                        const deflectObstacle = (o) => { o.isDeflected = true; o.vx = 10 + Math.random() * 5; o.vy = -15 - Math.random() * 5; o.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (0.6 + Math.random() * 0.4); };
+                        deflectObstacle(obs); createHitEffect(oCX, oCY); player.state = 'DEFLECT'; player.currentFrame = 0; player.tickCount = 0; 
+                    }
+                } else { obs.x += obs.vx; obs.y += obs.vy; obs.vy += OBSTACLE_GRAVITY; obs.angle += obs.rotationSpeed; }
             });
 
-            // ★ 파티클 업데이트
-            for (let i = obstacleTrails.length - 1; i >= 0; i--) {
-                let p = obstacleTrails[i];
-                p.x += p.speedX;
-                p.life -= 0.13; // ★ 잔상 사라지는 속도 조절
-                if (p.life <= 0) obstacleTrails.splice(i, 1);
+            // ★ [신규] 흔들림 감쇄 로직
+            if (shakeAmount > 0) {
+                // 숫자를 크게 뺄수록 더 빨리 멈춰 (현재 프레임당 0.8씩 감소)
+                shakeAmount -= 0.8; 
+                if (shakeAmount < 0) shakeAmount = 0;
             }
 
-            if (player.state !== 'DEFLECT') {
-                let newState = (player.vy < 0) ? 'RISING' : 'FALLING';
-                if (player.state !== newState) {
-                    if (newState === 'RISING') createJumpEffect(player.x, player.y, player.drawWidth, player.drawHeight);
-                    player.state = newState; player.currentFrame = 0; player.tickCount = 0; player.animDir = 1;
-                }
-            }
-
+            // 나머지 업데이트 로직 (생략 - 기존 동일)
+            for (let i = envParticles.length - 1; i >= 0; i--) { let p = envParticles[i]; p.x += p.vx; p.y += p.vy; p.life -= p.decay; if (p.life <= 0) envParticles.splice(i, 1); }
+            for (let i = obstacleTrails.length - 1; i >= 0; i--) { let p = obstacleTrails[i]; p.x += p.speedX; p.life -= 0.13; if (p.life <= 0) obstacleTrails.splice(i, 1); }
+            if (player.state !== 'DEFLECT') { let newState = (player.vy < 0) ? 'RISING' : 'FALLING'; if (player.state !== newState) { if (newState === 'RISING') createJumpEffect(player.x, player.y, player.drawWidth, player.drawHeight); player.state = newState; player.currentFrame = 0; player.tickCount = 0; player.animDir = 1; } }
             player.tickCount++; const charTotalFrames = player.frames[player.state];
             if (player.tickCount > player.ticksPerFrame) {
                 player.tickCount = 0;
-                if (player.state === 'DEFLECT') { 
-                    player.currentFrame++; 
-                    if (player.currentFrame >= charTotalFrames) { player.state = (player.vy < 0) ? 'RISING' : 'FALLING'; player.currentFrame = 0; player.animDir = 1; } 
-                } 
-                else if (player.state === 'FALLING') { 
-                    player.currentFrame += player.animDir; 
-                    if (player.currentFrame >= charTotalFrames - 1) { player.currentFrame = charTotalFrames - 1; player.animDir = -1; }
-                    else if (player.currentFrame <= 0) { player.currentFrame = 0; player.animDir = 1; }
-                }
+                if (player.state === 'DEFLECT') { player.currentFrame++; if (player.currentFrame >= charTotalFrames) { player.state = (player.vy < 0) ? 'RISING' : 'FALLING'; player.currentFrame = 0; player.animDir = 1; } } 
+                else if (player.state === 'FALLING') { player.currentFrame += player.animDir; if (player.currentFrame >= charTotalFrames - 1) { player.currentFrame = charTotalFrames - 1; player.animDir = -1; } else if (player.currentFrame <= 0) { player.currentFrame = 0; player.animDir = 1; } }
                 else if (player.state === 'RISING') { if (player.currentFrame < charTotalFrames - 1) player.currentFrame++; }
             }
-
             [jumpEffects, hitEffects].forEach(arr => { for (let i = arr.length - 1; i >= 0; i--) { let eff = arr[i]; eff.tickCount++; if (eff.tickCount > eff.ticksPerFrame) { eff.tickCount = 0; eff.currentFrame++; if (eff.currentFrame >= eff.totalFrames) arr.splice(i, 1); } } });
             for (let i = obstacles.length - 1; i >= 0; i--) { if (obstacles[i].x < -200 || obstacles[i].x > canvas.width + 2500 || obstacles[i].y > canvas.height + 200) obstacles.splice(i, 1); }
         }
@@ -190,46 +209,36 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // 1. 벽 배경
-            if (imgs.wall.complete) {
-                ctx.drawImage(imgs.wall, background.wallX, canvas.height - 850, 2560, 850);
-                ctx.drawImage(imgs.wall, background.wallX + 2560, canvas.height - 850, 2560, 850);
+            // ★ [핵심] 화면 흔들림 적용
+            ctx.save(); // 현재 캔버스 상태 저장
+            if (shakeAmount > 0) {
+                const sx = Math.random() * shakeAmount - shakeAmount / 2;
+                const sy = Math.random() * shakeAmount - shakeAmount / 2;
+                ctx.translate(sx, sy); // 랜덤한 방향으로 캔버스를 살짝 밀어줌
             }
-            
-            // ★ [신규] 잔상 파티클 그리기
-            obstacleTrails.forEach(p => {
-                ctx.globalAlpha = p.life;
-                ctx.fillStyle = p.color;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                ctx.fill();
-            });
-            ctx.globalAlpha = 1.0;
 
+            // --- 모든 그리기 로직 (save와 restore 사이) ---
+            if (imgs.wall.complete) { ctx.drawImage(imgs.wall, background.wallX, canvas.height - 850, 2560, 850); ctx.drawImage(imgs.wall, background.wallX + 2560, canvas.height - 850, 2560, 850); }
+            envParticles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); }); ctx.globalAlpha = 1.0;
+            obstacleTrails.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill(); }); ctx.globalAlpha = 1.0;
             jumpEffects.forEach(eff => { if (imgs.jumpEff.complete) ctx.drawImage(imgs.jumpEff, eff.currentFrame * 256, 0, 256, 256, eff.x, eff.y, eff.size, eff.size); });
-            
             let curS = (player.state === 'DEFLECT') ? imgs.deflect : (player.state === 'RISING' ? imgs.rising : imgs.falling);
             if (curS.complete) ctx.drawImage(curS, player.currentFrame * 256, 0, 256, 256, player.x, player.y, player.drawWidth, player.drawHeight);
-            
-            obstacles.forEach(obs => {
-                ctx.save(); ctx.translate(obs.x + obs.size/2, obs.y + obs.size/2);
-                if (obs.type === 'AXE' || obs.isDeflected) ctx.rotate(obs.angle);
-                if (obs.img.complete) ctx.drawImage(obs.img, -obs.size/2, -obs.size/2, obs.size, obs.size);
-                ctx.restore();
-            });
-            
+            obstacles.forEach(obs => { ctx.save(); ctx.translate(obs.x + obs.size/2, obs.y + obs.size/2); if (obs.type === 'AXE' || obs.isDeflected) ctx.rotate(obs.angle); if (obs.img.complete) ctx.drawImage(obs.img, -obs.size/2, -obs.size/2, obs.size, obs.size); ctx.restore(); });
             hitEffects.forEach(eff => { if (imgs.hitEff.complete) ctx.drawImage(imgs.hitEff, eff.currentFrame * 256, 0, 256, 256, eff.x, eff.y, eff.size, eff.size); });
-            
-            if (imgs.trap.complete) {
-                ctx.drawImage(imgs.trap, background.trapX, canvas.height - TRAP_HEIGHT, canvas.width, TRAP_HEIGHT);
-                ctx.drawImage(imgs.trap, background.trapX + canvas.width, canvas.height - TRAP_HEIGHT, canvas.width, TRAP_HEIGHT);
-            }
+            if (imgs.trap.complete) { ctx.drawImage(imgs.trap, background.trapX, canvas.height - TRAP_HEIGHT, canvas.width, TRAP_HEIGHT); ctx.drawImage(imgs.trap, background.trapX + canvas.width, canvas.height - TRAP_HEIGHT, canvas.width, TRAP_HEIGHT); }
+            if (imgs.ceiling.complete) { ctx.drawImage(imgs.ceiling, background.ceilingX, 0, 2560, 80); ctx.drawImage(imgs.ceiling, background.ceilingX + 2560, 0, 2560, 80); }
 
-            if (imgs.ceiling.complete) {
-                ctx.drawImage(imgs.ceiling, background.ceilingX, 0, 2560, 80);
-                ctx.drawImage(imgs.ceiling, background.ceilingX + 2560, 0, 2560, 80);
-            }
-            
+            ctx.restore(); // 흔들림 적용 끝! 원래 캔버스 좌표로 복구
+
+            // 뮤트 버튼 (흔들리지 않게 restore 뒤에 그림)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'; ctx.beginPath(); ctx.arc(muteBtn.x + 30, muteBtn.y + 30, 35, 0, Math.PI * 2); ctx.fill(); 
+            ctx.strokeStyle = 'white'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(muteBtn.x + 40, muteBtn.y + 15); ctx.lineTo(muteBtn.x + 40, muteBtn.y + 45); 
+            ctx.arc(muteBtn.x + 33, muteBtn.y + 45, 7, 0, Math.PI * 2); 
+            ctx.moveTo(muteBtn.x + 40, muteBtn.y + 15); ctx.quadraticCurveTo(muteBtn.x + 50, muteBtn.y + 20, muteBtn.x + 50, muteBtn.y + 30); ctx.stroke();
+            if (isMuted) { ctx.strokeStyle = 'red'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(muteBtn.x + 15, muteBtn.y + 15); ctx.lineTo(muteBtn.x + 45, muteBtn.y + 45); ctx.moveTo(muteBtn.x + 45, muteBtn.y + 15); ctx.lineTo(muteBtn.x + 15, muteBtn.y + 45); ctx.stroke(); }
+
             update(); requestAnimationFrame(draw);
         }
         draw();
