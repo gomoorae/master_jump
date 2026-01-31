@@ -239,9 +239,9 @@
 
             if (isGameOver) {
                 ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'white'; ctx.font = 'bold 80px Arial'; ctx.textAlign = 'center'; ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 20);
+                ctx.fillStyle = 'white'; ctx.font = 'bold 80px Arial'; ctx.textAlign = 'center'; ctx.fillText('난관 돌파 실패', canvas.width/2, canvas.height/2 - 20);
                 ctx.fillStyle = '#5d4037'; ctx.fillRect(canvas.width/2 - 100, canvas.height/2 + 80, 200, 60);
-                ctx.fillStyle = 'white'; ctx.font = 'bold 28px Arial'; ctx.textBaseline = 'middle'; ctx.fillText('RETRY', canvas.width/2, canvas.height/2 + 112); ctx.textBaseline = 'alphabetic';
+                ctx.fillStyle = 'white'; ctx.font = 'bold 28px Arial'; ctx.textBaseline = 'middle'; ctx.fillText('재도전', canvas.width/2, canvas.height/2 + 112); ctx.textBaseline = 'alphabetic';
             }
 
             // ★ 클리어 오버레이 (수정됨: 완전히 나갔을 때만 표시)
@@ -261,7 +261,7 @@
                 const stepW = (ui.volBar.w / 8) - ui.volBar.gap;
                 for (let i = 0; i < 8; i++) { ctx.fillStyle = (i < volumeSteps) ? '#f1c40f' : '#1a1008'; ctx.fillRect(ui.volBar.x + i * (stepW + ui.volBar.gap), ui.volBar.y, stepW, ui.volBar.h); }
                 ctx.fillStyle = '#5d4037'; ctx.fillRect(cX - 100, cY + 80, 200, 60);
-                ctx.fillStyle = 'white'; ctx.font = 'bold 28px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('RESUME', cX, cY + 112); ctx.textBaseline = 'alphabetic';
+                ctx.fillStyle = 'white'; ctx.font = 'bold 28px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('도전 지속', cX, cY + 112); ctx.textBaseline = 'alphabetic';
             }
             update(); requestAnimationFrame(draw);
         }
