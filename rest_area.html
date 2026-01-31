@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>정수협객: 휴식과 깨달음 (시스템 완성판)</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Dokdo&display=swap');
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         canvas { background: #0a0a0a; border: 5px solid #5d4037; }
         #cutsceneVideo { position: absolute; width: 1600px; height: 900px; display: none; object-fit: cover; }
@@ -122,9 +123,9 @@
                 if (imgs.resultBG.complete) ctx.drawImage(imgs.resultBG, 0, 0, 1600, 900);
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                 ctx.fillRect(200, 350, 1200, 200);
-                ctx.fillStyle = 'white'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
+                ctx.fillStyle = 'white'; ctx.font = '60px "Dokdo"'; ctx.textAlign = 'center';
                 ctx.fillText(resultMessage, 800, 440);
-                ctx.font = '24px Arial'; ctx.fillText("▶ 다음 난관으로 이동하자", 800, 510);
+                ctx.font = '40px "Dokdo"'; ctx.fillText("-> 다음 난관으로 이동하자", 800, 510);
             }
 
             requestAnimationFrame(draw);
@@ -135,23 +136,23 @@
             ctx.fillRect(100, 700, 1400, 150);
             ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 5;
             ctx.strokeRect(100, 700, 1400, 150);
-            ctx.fillStyle = 'white'; ctx.font = '32px Arial'; ctx.textAlign = 'left';
+            ctx.fillStyle = 'white'; ctx.font = '50px "Dokdo"'; ctx.textAlign = 'left';
             ctx.fillText(text, 150, 785);
             ctx.font = '20px Arial'; ctx.textAlign = 'right';
             ctx.fillText("▶", 1450, 830);
         }
 
         function drawChoiceButtons() {
-            ctx.fillStyle = 'white'; ctx.font = 'bold 45px Arial'; ctx.textAlign = 'center';
+            ctx.fillStyle = 'white'; ctx.font = '80px "Dokdo"'; ctx.textAlign = 'center';
             ctx.fillText("진기를 관조해본 결과..", 800, 300);
             
             // 버튼 1: 진기 총량
             ctx.fillStyle = '#1b5e20'; ctx.fillRect(400, 450, 350, 100);
-            ctx.fillStyle = 'white'; ctx.font = '28px Arial'; ctx.fillText("진기 총량 증가", 575, 510);
+            ctx.fillStyle = 'white'; ctx.font = '40px "Dokdo"'; ctx.fillText("진기 총량 증가", 575, 510);
             
             // 버튼 2: 회복 속도
             ctx.fillStyle = '#01579b'; ctx.fillRect(850, 450, 350, 100);
-            ctx.fillStyle = 'white'; ctx.fillText("진기 회복 속도 증가", 1025, 510);
+            ctx.fillStyle = 'white'; ctx.font = '40px "Dokdo"'; ctx.fillText("진기 회복 속도 증가", 1025, 510);
         }
 
         draw();

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>정수협객: 도검 산림 (클리어 연출 수정)</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Dokdo&display=swap');
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         canvas { background: #0a0a0a; border: 5px solid #5d4037; box-shadow: 0 0 20px rgba(0,255,0,0.2); cursor: pointer; }
     </style>
@@ -240,15 +239,15 @@
 
             if (isGameOver) {
                 ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'white'; ctx.font = '110px "Dokdo"'; ctx.textAlign = 'center'; ctx.fillText('난관 돌파 실패', canvas.width/2, canvas.height/2 - 20);
+                ctx.fillStyle = 'white'; ctx.font = 'bold 80px Arial'; ctx.textAlign = 'center'; ctx.fillText('난관 돌파 실패', canvas.width/2, canvas.height/2 - 20);
                 ctx.fillStyle = '#5d4037'; ctx.fillRect(canvas.width/2 - 100, canvas.height/2 + 80, 200, 60);
-                ctx.fillStyle = 'white'; ctx.font = '40px "Dokdo"'; ctx.textBaseline = 'middle'; ctx.fillText('재도전', canvas.width/2, canvas.height/2 + 112); ctx.textBaseline = 'alphabetic';
+                ctx.fillStyle = 'white'; ctx.font = 'bold 28px Arial'; ctx.textBaseline = 'middle'; ctx.fillText('재도전', canvas.width/2, canvas.height/2 + 112); ctx.textBaseline = 'alphabetic';
             }
 
             // ★ 클리어 오버레이 (수정됨: 완전히 나갔을 때만 표시)
             if (isClear && isFullyExited) {
                 ctx.fillStyle = 'rgba(0, 255, 0, 0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'white'; ctx.font = '110px "Dokdo"'; ctx.textAlign = 'center';
+                ctx.fillStyle = 'white'; ctx.font = 'bold 80px Arial'; ctx.textAlign = 'center';
                 ctx.fillText('난관 돌파!', canvas.width/2, canvas.height/2);
             }
 
@@ -262,7 +261,7 @@
                 const stepW = (ui.volBar.w / 8) - ui.volBar.gap;
                 for (let i = 0; i < 8; i++) { ctx.fillStyle = (i < volumeSteps) ? '#f1c40f' : '#1a1008'; ctx.fillRect(ui.volBar.x + i * (stepW + ui.volBar.gap), ui.volBar.y, stepW, ui.volBar.h); }
                 ctx.fillStyle = '#5d4037'; ctx.fillRect(cX - 100, cY + 80, 200, 60);
-                ctx.fillStyle = 'white'; ctx.font = '40px "Dokdo"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('도전 지속', cX, cY + 112); ctx.textBaseline = 'alphabetic';
+                ctx.fillStyle = 'white'; ctx.font = 'bold 28px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('도전 지속', cX, cY + 112); ctx.textBaseline = 'alphabetic';
             }
             update(); requestAnimationFrame(draw);
         }
