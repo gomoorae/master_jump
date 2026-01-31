@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>정수협객: 휴식과 깨달음 (시스템 완성판)</title>
+    <style>
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        canvas { background: #0a0a0a; border: 5px solid #5d4037; }
+        #cutsceneVideo { position: absolute; width: 1600px; height: 900px; display: none; object-fit: cover; }
+    </style>
+</head>
+<body>
+    <video id="cutsceneVideo" src="assets/rest_stage/cutscene.mp4"></video>
+    <canvas id="restCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('restCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('cutsceneVideo');
+        canvas.width = 1600; canvas.height = 900;
+
+        // 1. 에셋 및 상태 관리
+        const imgs = {
+            introBGs: [new Image(), new Image(), new Image()],
+            rewardBG: new Image(),
+            resultBG: new Image() // ★ 결과 화면용 이미지
+        };
+
+        imgs.introBGs[0].src = 'assets/rest_stage/intro_bg1.png';
+        imgs.introBGs[1].src = 'assets/rest_stage/intro_bg2.png';
+        imgs.introBGs[2].src = 'assets/rest_stage/intro_bg3.png';
+        imgs.rewardBG.src = 'assets/rest_stage/reward_bg.png';
+        imgs.resultBG.src = 'assets/rest_stage/result_bg.png'; // ★ 파일명 확인!
+
+        let scene = 'INTRO'; // INTRO, VIDEO, REWARD_TALK, CHOICE, RESULT
+        let dialogueIndex = 0;
+        let resultMessage = ""; // 결과 화면에 띄울 문구
+
+        const introTalk = [
+            "첫번째 난관을 돌파하자, 잠시 쉴 수 있는 동굴이 나왔다.",
+            "허공에서 빛나고 있는 신비한 구슬을 발견했다.",
+            "가까이 다가가자 구슬이 한차례 공명하기 시작했다."
+        ];
+
+        const rewardTalk = [
+            "구슬의 기운이 흡수되었다.",
+            "진기에 변화가 생긴걸 느끼고, 차분히 내부를 관조해 보았다."
+        ];
+
+        // 2. 클릭 이벤트 제어
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            if (scene === 'INTRO') {
+                dialogueIndex++;
+                if (dialogueIndex >= introTalk.length) {
+                    startVideo(); // ★ 프리 비디오 없이 바로 영상 재생
+                }
+            } else if (scene === 'REWARD_TALK') {
+                dialogueIndex++;
+                if (dialogueIndex >= rewardTalk.length) {
+                    scene = 'CHOICE';
+                }
+            } else if (scene === 'CHOICE') {
+                // 보상 버튼 클릭 판정 (좌표 기준)
+                if (my >= 450 && my <= 550) {
+                    if (mx >= 400 && mx <= 750) selectReward('CAPACITY');
+                    else if (mx >= 850 && mx <= 1200) selectReward('SPEED');
+                }
+            } else if (scene === 'RESULT') {
+                // 결과 화면에서 클릭하면 다음 스테이지로
+                window.location.href = 'stage_2.html';
+            }
+        });
+
+        function startVideo() {
+            scene = 'VIDEO';
+            video.style.display = 'block';
+            video.play();
+            video.onended = () => {
+                video.style.display = 'none';
+                scene = 'REWARD_TALK';
+                dialogueIndex = 0;
+            };
+        }
+
+        // 3. 보상 로직 실제 구현
+        function selectReward(type) {
+            let currentMax = parseInt(localStorage.getItem('maxJingi')) || 8;
+            let currentSpeed = parseInt(localStorage.getItem('jingiRecoverThreshold')) || 180;
+
+            if (type === 'CAPACITY') {
+                localStorage.setItem('maxJingi', currentMax + 1);
+                resultMessage = "진기의 그릇이 넓어져 있었다.";
+            } else if (type === 'SPEED') {
+                // 회복 속도를 180프레임에서 120프레임으로 단축 (3초 -> 2초)
+                localStorage.setItem('jingiRecoverThreshold', Math.max(60, currentSpeed - 30));
+                resultMessage = "진기의 순환이 빨라져 있었다.";
+            }
+            
+            scene = 'RESULT'; // ★ 팝업 대신 결과 장면으로 전환
+        }
+
+        // 4. 렌더링 루프
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (scene === 'INTRO') {
+                let curBG = imgs.introBGs[dialogueIndex];
+                if (curBG && curBG.complete) ctx.drawImage(curBG, 0, 0, 1600, 900);
+                drawDialogue(introTalk[dialogueIndex]);
+
+            } else if (scene === 'REWARD_TALK' || scene === 'CHOICE') {
+                if (imgs.rewardBG.complete) ctx.drawImage(imgs.rewardBG, 0, 0, 1600, 900);
+                if (scene === 'REWARD_TALK') drawDialogue(rewardTalk[dialogueIndex]);
+                else drawChoiceButtons();
+
+            } else if (scene === 'RESULT') {
+                // ★ 결과 화면 렌더링
+                if (imgs.resultBG.complete) ctx.drawImage(imgs.resultBG, 0, 0, 1600, 900);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(200, 350, 1200, 200);
+                ctx.fillStyle = 'white'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
+                ctx.fillText(resultMessage, 800, 440);
+                ctx.font = '24px Arial'; ctx.fillText("▶ 다음 난관으로 이동하자", 800, 510);
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        function drawDialogue(text) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(100, 700, 1400, 150);
+            ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 5;
+            ctx.strokeRect(100, 700, 1400, 150);
+            ctx.fillStyle = 'white'; ctx.font = '32px Arial'; ctx.textAlign = 'left';
+            ctx.fillText(text, 150, 785);
+            ctx.font = '20px Arial'; ctx.textAlign = 'right';
+            ctx.fillText("▶", 1450, 830);
+        }
+
+        function drawChoiceButtons() {
+            ctx.fillStyle = 'white'; ctx.font = 'bold 45px Arial'; ctx.textAlign = 'center';
+            ctx.fillText("진기를 관조해본 결과..", 800, 300);
+            
+            // 버튼 1: 진기 총량
+            ctx.fillStyle = '#1b5e20'; ctx.fillRect(400, 450, 350, 100);
+            ctx.fillStyle = 'white'; ctx.font = '28px Arial'; ctx.fillText("진기 총량 증가", 575, 510);
+            
+            // 버튼 2: 회복 속도
+            ctx.fillStyle = '#01579b'; ctx.fillRect(850, 450, 350, 100);
+            ctx.fillStyle = 'white'; ctx.fillText("진기 회복 속도 증가", 1025, 510);
+        }
+
+        draw();
+    </script>
+</body>
+</html>
