@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>정수협객: 제2관문 (최적화 완료)</title>
+    <title>정수협객: 제2관문 (최종 완성판)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Dokdo&display=swap');
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
@@ -77,14 +77,10 @@
             if(volumeSteps > 0) { bgm.currentTime = 0; bgm.play(); }
         }
 
-        // --- 기능 함수 (최적화 적용) ---
         function createJumpEffect(px, py, pw, ph) { jumpEffects.push({ x: px + (pw/2)-65-15, y: py+ph-65-19, size: 130, currentFrame: 0, totalFrames: 6, tickCount: 0, ticksPerFrame: 3 }); }
-        
-        // ★ 타격 위치 보정 (x-50, y-50)
         function createHitEffect(x, y) { hitEffects.push({ x: x, y: y - 50, size: 100, currentFrame: 0, totalFrames: 5, tickCount: 0, ticksPerFrame: 2 }); }
         
         function createEnvBurst(x, y, isCeiling) {
-            // 파티클이 너무 많으면 생성 생략 (성능 방어)
             if (envParticles.length > 200) return;
             for (let i = 0; i < 12; i++) { envParticles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 8, vy: isCeiling ? (Math.random() * 5 + 2) : (Math.random() * -5 - 2), size: Math.random() * 3 + 2, color: '#ffffff', life: 1.0, decay: Math.random() * 0.05 + 0.03 }); }
             if (!isGameOver && !isClear) shakeAmount = 15; 
@@ -92,7 +88,6 @@
         }
 
         function createTrail(x, y, type) {
-            // 잔상이 너무 많으면 생성 생략 (성능 방어)
             if (obstacleTrails.length > 300) return;
             obstacleTrails.push({ x: x, y: y, alpha: 0.6, size: Math.random() * 4, color: (type === 'SPEAR') ? '#ffffff' : '#aaccff', speedX: Math.random() * 2, life: 1.0 });
         }
@@ -100,7 +95,7 @@
         function spawnObstacle() {
             if (isClear) return;
             let progress = stageFrameCount / TOTAL_STAGE_TIME; 
-            let currentSpawnProb = 0.035 + (0.045 * progress); 
+            let currentSpawnProb = 0.035 + (0.045 * progress);
             if (Math.random() < currentSpawnProb) {
                 const types = ['AXE', 'SPEAR', 'SWORD']; const selectedType = types[Math.floor(Math.random() * types.length)];
                 let obsData = { x: canvas.width, angle: 0, isDeflected: false, vx: 0, vy: 0, type: selectedType, rotationSpeed: 0.18, size: 70 };
@@ -172,10 +167,7 @@
             obstacles.forEach((obs) => {
                 if (!obs.isDeflected) {
                     obs.x -= obs.speed; if (obs.type === 'AXE') { obs.y += obs.vy; obs.vy += 0.09; obs.angle -= 0.18; }
-                    
-                    // ★ 최적화: 쳐내기 전일 때만 잔상 생성
                     if (obs.type === 'SPEAR' || obs.type === 'SWORD') { createTrail(obs.x + 10, obs.y + obs.size/2, obs.type); }
-                    
                     const oCX = obs.x + obs.size / 2; const oCY = obs.y + obs.size / 2;
                     const isHit = (phX < oCX + 20 && phX + 50 > oCX - 20 && phY < oCY + 20 && phY + 90 > oCY - 20);
                     if (isHit && player.state !== 'DEFLECT') { 
@@ -187,28 +179,36 @@
             });
 
             if (shakeAmount > 0) shakeAmount -= 0.8;
-            
-            // ★ 최적화: 파티클 수명 감쇠 속도 소폭 상향
             for (let i = envParticles.length - 1; i >= 0; i--) { let p = envParticles[i]; p.x += p.vx; p.y += p.vy; p.life -= p.decay; if (p.life <= 0) envParticles.splice(i, 1); }
             for (let i = obstacleTrails.length - 1; i >= 0; i--) { let p = obstacleTrails[i]; p.x += p.speedX; p.life -= 0.15; if (p.life <= 0) obstacleTrails.splice(i, 1); }
-            
-            // ★ 최적화: 화면 밖 무기 제거 범위 축소 (150픽셀)
-            for (let i = obstacles.length - 1; i >= 0; i--) {
-                const o = obstacles[i];
-                if (o.x < -150 || o.x > canvas.width + 150 || o.y > canvas.height + 150) {
-                    obstacles.splice(i, 1);
-                }
-            }
+            for (let i = obstacles.length - 1; i >= 0; i--) { const o = obstacles[i]; if (o.x < -150 || o.x > canvas.width + 150 || o.y > canvas.height + 150) { obstacles.splice(i, 1); } }
 
             if (player.state !== 'DEFLECT' && player.state !== 'CLEAR_EXIT' && player.state !== 'DEAD') { 
                 let newState = (player.vy < 0) ? 'RISING' : 'FALLING'; 
                 if (player.state !== newState) { if (newState === 'RISING') createJumpEffect(player.x, player.y, player.drawWidth, player.drawHeight); player.state = newState; player.currentFrame = 0; player.tickCount = 0; player.animDir = 1; } 
             }
-            player.tickCount++; const total = player.frames[player.state] || 6; 
+
+            // ★ 애니메이션 로직 개선 (상승 고정 & 점멸 방지)
+            player.tickCount++;
+            const total = player.frames[player.state] || 6; 
             if (player.tickCount > player.ticksPerFrame) {
                 player.tickCount = 0;
-                if (player.state === 'FALLING') { player.currentFrame += player.animDir; if (player.currentFrame >= total - 1 || player.currentFrame <= 0) player.animDir *= -1; player.currentFrame = Math.max(0, Math.min(total - 1, player.currentFrame)); }
-                else { player.currentFrame++; if (player.currentFrame >= total) { if (player.state === 'DEFLECT') player.state = (player.vy < 0) ? 'RISING' : 'FALLING'; player.currentFrame = 0; } }
+                if (player.state === 'FALLING') { 
+                    player.currentFrame += player.animDir; 
+                    if (player.currentFrame >= total - 1 || player.currentFrame <= 0) player.animDir *= -1; 
+                    player.currentFrame = Math.max(0, Math.min(total - 1, player.currentFrame)); 
+                } else if (player.state === 'RISING') {
+                    // ★ 상승 시 마지막 프레임에서 멈추기
+                    if (player.currentFrame < total - 1) {
+                        player.currentFrame++;
+                    }
+                } else { 
+                    player.currentFrame++; 
+                    if (player.currentFrame >= total) { 
+                        if (player.state === 'DEFLECT') player.state = (player.vy < 0) ? 'RISING' : 'FALLING'; 
+                        player.currentFrame = 0; 
+                    } 
+                }
             }
             [jumpEffects, hitEffects].forEach(arr => { for (let i = arr.length - 1; i >= 0; i--) { let eff = arr[i]; eff.tickCount++; if (eff.tickCount > eff.ticksPerFrame) { eff.tickCount = 0; eff.currentFrame++; if (eff.currentFrame >= eff.totalFrames) arr.splice(i, 1); } } });
         }
@@ -228,12 +228,13 @@
             
             obstacles.forEach(obs => { ctx.save(); ctx.translate(obs.x + obs.size/2, obs.y + obs.size/2); if (obs.type === 'AXE' || obs.isDeflected) ctx.rotate(obs.angle); if (obs.img.complete) ctx.drawImage(obs.img, -obs.size/2, -obs.size/2, obs.size, obs.size); ctx.restore(); });
             hitEffects.forEach(eff => { if (imgs.hitEff.complete) ctx.drawImage(imgs.hitEff, eff.currentFrame * 256, 0, 256, 256, eff.x, eff.y, eff.size, eff.size); });
-            
             if (imgs.trap.complete) { ctx.drawImage(imgs.trap, background.trapX, canvas.height - TRAP_HEIGHT, canvas.width, TRAP_HEIGHT); ctx.drawImage(imgs.trap, background.trapX + canvas.width, canvas.height - TRAP_HEIGHT, canvas.width, TRAP_HEIGHT); }
             if (imgs.ceiling.complete) { ctx.drawImage(imgs.ceiling, background.ceilingX, 0, 2560, 80); ctx.drawImage(imgs.ceiling, background.ceilingX + 2560, 0, 2560, 80); }
             ctx.restore();
 
+            // ★ UI 그리기 전 테두리 굵기 초기화 (찐빠 방지)
             const jb = ui.jingiBar;
+            ctx.lineWidth = 2; //
             for (let i = 0; i < player.maxJingi; i++) {
                 ctx.fillStyle = (i < player.jingi) ? jb.color : 'rgba(255, 255, 255, 0.1)';
                 ctx.strokeStyle = (i < player.jingi) ? 'white' : 'rgba(255, 255, 255, 0.2)';
@@ -251,7 +252,7 @@
             }
             if (isClear && isFullyExited) {
                 ctx.fillStyle = 'rgba(0, 255, 0, 0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'white'; ctx.font = '110px "Dokdo"'; ctx.textAlign = 'center'; ctx.fillText('제2관문 돌파!', canvas.width/2, canvas.height/2);
+                ctx.fillStyle = 'white'; ctx.font = '110px "Dokdo"'; ctx.textAlign = 'center'; ctx.fillText('난관 돌파!', canvas.width/2, canvas.height/2);
             }
             if (isPaused) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -260,7 +261,8 @@
                 ctx.strokeRect(cX - 300, cY - 200, 600, 400); ctx.fillRect(cX - 300, cY - 200, 600, 400);
                 const sImg = (volumeSteps === 0) ? imgs.bgmOff : imgs.bgmOn;
                 if (sImg.complete) ctx.drawImage(sImg, ui.soundIcon.x, ui.soundIcon.y, ui.soundIcon.size, ui.soundIcon.size);
-                for (let i = 0; i < 8; i++) { ctx.fillStyle = (i < volumeSteps) ? '#f1c40f' : '#1a1008'; ctx.fillRect(ui.volBar.x + i * 40, ui.volBar.y, 35, ui.volBar.h); }
+                const vStepW = (ui.volBar.w / 8) - ui.volBar.gap;
+                for (let i = 0; i < 8; i++) { ctx.fillStyle = (i < volumeSteps) ? '#f1c40f' : '#1a1008'; ctx.fillRect(ui.volBar.x + i * (vStepW + ui.volBar.gap), ui.volBar.y, vStepW, ui.volBar.h); }
                 ctx.fillStyle = '#5d4037'; ctx.fillRect(cX - 100, cY + 80, 200, 60);
                 ctx.fillStyle = 'white'; ctx.font = '40px "Dokdo"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('도전 지속', cX, cY + 112); ctx.textBaseline = 'alphabetic';
             }
