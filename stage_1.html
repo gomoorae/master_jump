@@ -2,9 +2,9 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>정수협객: 도검 산림 (애니메이션 최적화)</title>
+    <title>무혼 비경: 제1 난관</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Dokdo&display=swap');
+        @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         canvas { background: #0a0a0a; border: 5px solid #5d4037; box-shadow: 0 0 20px rgba(0,255,0,0.2); cursor: pointer; }
     </style>
@@ -47,7 +47,7 @@
         const TOTAL_STAGE_TIME = 180 * 60; 
 
         // 3. 물리 및 플레이어 설정
-        const TRAP_HEIGHT = 80; const TRAP_SPEED = 6; const OBSTACLE_GRAVITY = 0.8; const AXE_GRAVITY = 0.09;
+        const TRAP_HEIGHT = 80; const TRAP_SPEED = 6; const OBSTACLE_GRAVITY = 0.8; const AXE_GRAVITY = 0.11;
         const background = { wallX: 0, wallSpeed: 2, ceilingX: 0, ceilingSpeed: 8, trapX: 0 };
         const player = {
             x: 350, y: 100, drawWidth: 125, drawHeight: 125,
@@ -86,7 +86,7 @@
         function createTrail(x, y, type) { obstacleTrails.push({ x: x, y: y, alpha: 0.6, size: Math.random() * 4, color: (type === 'SPEAR') ? '#ffffff' : '#aaccff', speedX: Math.random() * 2, life: 1.0 }); }
         function spawnObstacle() {
             if (isClear) return;
-            let progress = stageFrameCount / TOTAL_STAGE_TIME; let currentSpawnProb = 0.03 + (0.04 * progress); 
+            let progress = stageFrameCount / TOTAL_STAGE_TIME; let currentSpawnProb = 0.02 + (0.03 * progress); 
             if (Math.random() < currentSpawnProb) {
                 const types = ['AXE', 'SPEAR', 'SWORD']; const selectedType = types[Math.floor(Math.random() * types.length)];
                 let obsData = { x: canvas.width, angle: 0, isDeflected: false, vx: 0, vy: 0, type: selectedType, rotationSpeed: 0.18, size: 70 };
@@ -131,7 +131,7 @@
                         isFullyExited = true;
                         localStorage.setItem('maxJingi', player.maxJingi);
                         localStorage.setItem('jingiRecoverThreshold', 180);
-                        setTimeout(() => { window.location.href = 'rest_area.html'; }, 2000);
+                        setTimeout(() => { window.location.href = 'rest_area_1.html'; }, 2000);
                     }
                 }
                 return; 
@@ -153,17 +153,43 @@
             const phX = player.x + player.hitboxOffsetX; const phY = player.y + player.hitboxOffsetY;
             obstacles.forEach((obs) => {
                 if (!obs.isDeflected) {
-                    obs.x -= obs.speed; if (obs.type === 'AXE') { obs.y += obs.vy; obs.vy += AXE_GRAVITY; obs.angle -= 0.18; }
+                    // [1] 아직 튕겨나가지 않은 무기의 이동 및 충돌 계산
+                    obs.x -= obs.speed; 
+                    if (obs.type === 'AXE') { obs.y += obs.vy; obs.vy += AXE_GRAVITY; obs.angle -= 0.18; }
                     if (obs.type === 'SPEAR' || obs.type === 'SWORD') { createTrail(obs.x + 10, obs.y + obs.size/2, obs.type); }
+                    
                     const oCX = obs.x + obs.size / 2; const oCY = obs.y + obs.size / 2;
                     const isHit = (phX < oCX + 20 && phX + 50 > oCX - 20 && phY < oCY + 20 && phY + 90 > oCY - 20);
-                    if (isHit && player.state !== 'DEFLECT') { 
-                        if (player.jingi > 0) player.jingi--;
-                        obs.isDeflected = true; obs.vx = 10 + Math.random() * 5; obs.vy = -15 - Math.random() * 5; obs.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * 0.4;
-                        createHitEffect(oCX, oCY); player.state = 'DEFLECT'; player.currentFrame = 0; player.tickCount = 0; 
+                    
+                    if (isHit) {
+                        if (player.state !== 'DEFLECT') {
+                            // --- 첫 번째 반격 성공 ---
+                            if (player.jingi > 0) player.jingi--;
+                            obs.isDeflected = true;
+                            obs.vx = 10 + Math.random() * 5;
+                            obs.vy = -15 - Math.random() * 5;
+                            obs.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * 0.4;
+                            createHitEffect(oCX, oCY);
+                            player.state = 'DEFLECT';
+                            player.currentFrame = 0;
+                            player.tickCount = 0;
+                        } else { 
+                            // --- ★ 반격 동작 중 추가 피격 (정수의 핵심 요청!) ---
+                            if (player.jingi > 0) {
+                                player.jingi--; // 진기 추가 차감
+                                createEnvBurst(oCX, oCY, false); // 피격 효과(흔들림) 연출
+                                obs.isDeflected = true; // 무기도 그냥 통과하지 않고 튕겨나감
+                                obs.vx = 5 + Math.random() * 5;
+                                obs.vy = 5 + Math.random() * 5; // 반격과 다른 궤적으로 튕김
+                                obs.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * 0.4;
+                            }
+                        }
                     }
-                } else { obs.x += obs.vx; obs.y += obs.vy; obs.vy += OBSTACLE_GRAVITY; obs.angle += obs.rotationSpeed; }
-            });
+                } else { 
+                    // [2] 이미 튕겨나간 무기들의 이동 로직 (이게 있어야 쳐낸 무기가 날아감!)
+                    obs.x += obs.vx; obs.y += obs.vy; obs.vy += OBSTACLE_GRAVITY; obs.angle += obs.rotationSpeed; 
+                }
+            }); // forEach 닫기
 
             if (shakeAmount > 0) shakeAmount -= 0.8;
             for (let i = envParticles.length - 1; i >= 0; i--) { let p = envParticles[i]; p.x += p.vx; p.y += p.vy; p.life -= p.decay; if (p.life <= 0) envParticles.splice(i, 1); }
@@ -239,12 +265,12 @@
             if (isGameOver) {
                 ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = 'white'; ctx.font = '110px "Dokdo"'; ctx.textAlign = 'center'; ctx.fillText('난관 돌파 실패', canvas.width/2, canvas.height/2 - 20);
-                ctx.fillStyle = '#5d4037'; ctx.fillRect(canvas.width/2 - 100, canvas.height/2 + 80, 200, 60);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(canvas.width/2 - 100, canvas.height/2 + 80, 200, 60);
                 ctx.fillStyle = 'white'; ctx.font = '40px "Dokdo"'; ctx.textBaseline = 'middle'; ctx.fillText('재도전', canvas.width/2, canvas.height/2 + 112); ctx.textBaseline = 'alphabetic';
             }
             if (isClear && isFullyExited) {
                 ctx.fillStyle = 'rgba(0, 255, 0, 0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'white'; ctx.font = '110px "Dokdo"'; ctx.textAlign = 'center'; ctx.fillText('난관 돌파!', canvas.width/2, canvas.height/2);
+                ctx.fillStyle = 'white'; ctx.font = '110px "Dokdo"'; ctx.textAlign = 'center'; ctx.fillText('제1 난관 돌파!', canvas.width/2, canvas.height/2);
             }
             if (isPaused) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);

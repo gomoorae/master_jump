@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>무혼 비동: 최종 각성 (완성본)</title>
+    <style>
+        @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        canvas { background: #0a0a0a; border: 5px solid #5d4037; cursor: pointer; }
+        #cutsceneVideo { position: absolute; width: 1600px; height: 900px; display: none; object-fit: cover; }
+    </style>
+</head>
+<body>
+    <video id="cutsceneVideo"></video>
+    <canvas id="restCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('restCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('cutsceneVideo');
+        canvas.width = 1600; canvas.height = 900;
+
+        // 1. 에셋 및 상태 관리
+        const imgs = {
+            introBGs: [new Image(), new Image(), new Image()],
+            rewardBG: new Image(),
+            resultBG: new Image()
+        };
+
+        // 이미지 경로 설정
+        imgs.introBGs[0].src = 'assets/rest_stage_3/intro_bg1.png';
+        imgs.introBGs[1].src = 'assets/rest_stage_3/intro_bg2.png';
+        imgs.introBGs[2].src = 'assets/rest_stage_3/intro_bg3.png';
+        imgs.rewardBG.src = 'assets/rest_stage_3/reward_bg.png';
+        imgs.resultBG.src = 'assets/rest_stage_3/result_bg.png';
+
+        // 비디오 경로 설정
+        const VIDEO_PATH = {
+            INTRO: 'assets/rest_stage_3/cutscene.mp4',
+            REWARD: 'assets/rest_stage_3/cutscene_reward.mp4' // ★ 새로 준비한 컷신 경로
+        };
+
+        let scene = 'INTRO'; // INTRO, VIDEO_INTRO, REWARD_TALK, VIDEO_REWARD, RESULT
+        let dialogueIndex = 0;
+        let resultMessage = "";
+
+        const introTalk = [
+            "난관을 돌파하자, 세번째 무혼 비동이 나왔다.",
+            "무혼의 원정이 허공에서 빛나고 있다.",
+            "가까이 다가가자 무혼의 원정이 공명하기 시작했다."
+        ];
+
+        const rewardTalk = [
+            "마지막 무혼의 원정이 흡수되었다.",
+            "모든 무혼의 원정이 하나로 합쳐지며, 내부에서 무혼의 힘이 느껴진다."
+        ];
+
+        // 2. 클릭 이벤트 제어
+        canvas.addEventListener('mousedown', (e) => {
+            if (scene === 'INTRO') {
+                dialogueIndex++;
+                if (dialogueIndex >= introTalk.length) {
+                    playVideo('VIDEO_INTRO', VIDEO_PATH.INTRO); // 인트로 영상 재생
+                }
+            } else if (scene === 'REWARD_TALK') {
+                dialogueIndex++;
+                if (dialogueIndex >= rewardTalk.length) {
+                    playVideo('VIDEO_REWARD', VIDEO_PATH.REWARD); // ★ 보상 컷신 재생
+                }
+            } else if (scene === 'RESULT') {
+                window.location.href = 'stage_4.html';
+            }
+        });
+
+        // 비디오 재생 공통 함수
+        function playVideo(nextScene, src) {
+            scene = nextScene;
+            video.src = src;
+            video.style.display = 'block';
+            video.play();
+        }
+
+        // 비디오 종료 시 로직
+        video.onended = () => {
+            video.style.display = 'none';
+            if (scene === 'VIDEO_INTRO') {
+                scene = 'REWARD_TALK';
+                dialogueIndex = 0;
+            } else if (scene === 'VIDEO_REWARD') {
+                // 보상 컷신이 끝난 후 보상 적용 및 결과창 이동
+                applyFinalReward();
+                scene = 'RESULT';
+            }
+        };
+
+        function applyFinalReward() {
+            localStorage.setItem('maxJingi', 14);
+            localStorage.setItem('jingiRecoverThreshold', 90);
+            resultMessage = "무혼의 진기를 완벽히 체득하여 진기의 그릇과 회복 속도가 최고치에 달했다.";
+        }
+
+        // 3. 렌더링 루프
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (scene === 'INTRO') {
+                let curBG = imgs.introBGs[dialogueIndex];
+                if (curBG && curBG.complete) ctx.drawImage(curBG, 0, 0, 1600, 900);
+                drawDialogue(introTalk[dialogueIndex]);
+
+            } else if (scene === 'REWARD_TALK') {
+                if (imgs.rewardBG.complete) ctx.drawImage(imgs.rewardBG, 0, 0, 1600, 900);
+                drawDialogue(rewardTalk[dialogueIndex]);
+
+            } else if (scene === 'RESULT') {
+                if (imgs.resultBG.complete) ctx.drawImage(imgs.resultBG, 0, 0, 1600, 900);
+                drawDialogue(resultMessage + "");
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        function drawDialogue(text) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(100, 700, 1400, 150);            
+            ctx.fillStyle = 'white'; ctx.font = '50px "Dokdo"'; ctx.textAlign = 'left';
+            const lines = text.split('\n');
+            lines.forEach((line, i) => {
+                ctx.fillText(line, 150, 770 + (i * 55));
+            });
+            ctx.font = '20px Arial'; ctx.textAlign = 'right';
+            ctx.fillText("▶", 1450, 830);
+        }
+
+        draw();
+    </script>
+</body>
+</html>

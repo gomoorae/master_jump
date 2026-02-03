@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>무혼 비동: 시련의 시작</title>
+    <style>
+        @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Dokdo', cursive; }
+        
+        /* 공통 전체 화면 설정 */
+        .screen { width: 1600px; height: 900px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; }
+        .active { display: block; }
+
+        /* 1. 타이틀 메뉴 화면 */
+        #titleMenu { background: url('assets/title/bg_title.png') no-repeat center/cover; }
+        
+        #startBtn { 
+            position: absolute;
+            left: 25%;
+            top: 35%;
+            transform: translateX(-50%);
+            width: 650px;
+            font-size: 80px;
+            cursor: pointer;
+            transition: 0.3s;
+            text-align: center;
+            background: rgba(0,0,0,0.5);
+            border: none;
+            color: #ffffff;
+            text-shadow: 2px 2px 10px rgba(0,0,0,0.8);
+        }
+        #startBtn:hover { 
+            transform: translateX(-50%) scale(1.1); 
+            color: #fc2828; 
+        }
+
+        /* 2. 컷신 화면 */
+        #cutsceneVideo { background: #000; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+
+        /* [3] 메시지 오버레이 (서책 배경 형태) */
+        #msgOverlay { background: rgba(0,0,0,0.6); cursor: pointer; } 
+        
+        .msg-box { 
+            position: absolute; 
+            left: 50%; 
+            top: 50%; 
+            transform: translate(-50%, -50%);
+            /* ★ 서책 이미지 설정 */
+            width: 1200px; 
+            height: 850px; 
+            background: url('assets/title/scroll_bg.png') no-repeat center/contain; 
+            /* 이미지 안쪽으로 텍스트가 들어오도록 여백 조정 */
+            padding: 100px 180px; 
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .msg-text { 
+            /* ★ 서책(종이) 위에 어울리는 짙은 갈색 계열 글자색 */
+            color: #2d1b0d; 
+            font-size: 50px; 
+            line-height: 1.5; 
+            white-space: pre-wrap; 
+            text-align: center;
+            word-break: keep-all;
+        }
+
+        .next-hint { 
+            position: absolute; 
+            bottom: 180px; 
+            right: 220px; 
+            color: #5d4037; 
+            font-size: 30px; 
+            animation: blink 1s infinite; 
+        }
+        
+        @keyframes blink { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <div id="titleMenu" class="screen active">
+        <div id="startBtn">무혼 비동에 들어간다</div>
+    </div>
+
+    <div id="cutsceneVideo" class="screen">
+        <video id="introVideo">
+            <source src="assets/title/cutscene_intro.mp4" type="video/mp4">
+        </video>
+    </div>
+
+    <div id="msgOverlay" class="screen">
+        <div class="msg-box">
+            <div id="msgContent" class="msg-text"></div>
+            <div class="next-hint">->></div>
+        </div>
+    </div>
+
+    <script>
+        const titleMenu = document.getElementById('titleMenu');
+        const cutsceneScreen = document.getElementById('cutsceneVideo');
+        const introVideo = document.getElementById('introVideo');
+        const msgOverlay = document.getElementById('msgOverlay');
+        const msgContent = document.getElementById('msgContent');
+
+        const introMessages = [
+            "[무혼 비동]\n모든 난관을 극복한 자만이 무혼을 얻을 것이다.",
+            "화면을 누르면 상승, 떼면 하강 한다.",
+            "바닥의 함정과 막혀있는 천장 사이에서,\n날아오는 무기를 피하여 난관을 돌파하여야 한다.",
+            "화면을 누르면 상승하고 떼면 하강하며,\n진기를 소비하여 위험을 자동 회비한다.",
+            "진기 표식 밑의 황색 표식이\n진기의 총량과 같은 위치에 도달하면 난관이 끝난다.",
+            "시련을 극복하고 무혼을 얻는것은\n그대의 손에 달려있다."
+        ];
+
+        let currentMsgIndex = 0;
+
+        function initNewGame() {
+            localStorage.setItem('maxJingi', 8);
+            localStorage.setItem('jingiRecoverThreshold', 180);
+        }
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            initNewGame();
+            titleMenu.classList.remove('active');
+            cutsceneScreen.classList.add('active');
+            introVideo.play();
+        });
+
+        introVideo.onended = () => {
+            cutsceneScreen.classList.remove('active');
+            msgOverlay.classList.add('active');
+            showNextMessage();
+        };
+
+        function showNextMessage() {
+            if (currentMsgIndex < introMessages.length) {
+                msgContent.innerText = introMessages[currentMsgIndex];
+                currentMsgIndex++;
+            } else {
+                window.location.href = 'stage_1.html';
+            }
+        }
+
+        msgOverlay.addEventListener('click', showNextMessage);
+    </script>
+</body>
+</html>

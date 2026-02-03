@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>무혼 비경: 제3난관</title>
+    <style>
+        @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        canvas { background: #0a0a0a; border: 5px solid #5d4037; box-shadow: 0 0 20px rgba(0,255,0,0.2); cursor: pointer; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 1600; canvas.height = 900;
+
+        // 1. 데이터 계승
+        const savedMaxJingi = parseInt(localStorage.getItem('maxJingi')) || 8;
+        const savedRecoverThreshold = parseInt(localStorage.getItem('jingiRecoverThreshold')) || 180;
+
+        // 2. 에셋 로딩
+        const imgs = {
+            rising: new Image(), falling: new Image(), jumpEff: new Image(),
+            trap: new Image(), deflect: new Image(), hitEff: new Image(),
+            axe: new Image(), spear: new Image(), sword: new Image(),
+            wall: new Image(), ceiling: new Image(), 
+            optionBtn: new Image(), bgmOn: new Image(), bgmOff: new Image(),
+            dead: new Image(), rightOut: new Image()
+        };
+        const CP = 'assets/common/';
+        imgs.rising.src = CP+'rising_sheet.png'; imgs.falling.src = CP+'falling_sheet.png';
+        imgs.jumpEff.src = CP+'jump_effect_sheet.png'; imgs.axe.src = CP+'axe.png';
+        imgs.spear.src = CP+'spear.png'; imgs.sword.src = CP+'sword.png'; 
+        imgs.trap.src = CP+'trap_asset.png'; imgs.deflect.src = CP+'deflect_sheet.png';
+        imgs.hitEff.src = CP+'hit_effect_sheet.png'; imgs.wall.src = CP+'bg_wall_s3.png';
+        imgs.ceiling.src = CP+'bg_ceiling.png'; imgs.optionBtn.src = CP+'option_btn.png';
+        imgs.bgmOn.src = CP+'bgm_on.png'; imgs.bgmOff.src = CP+'bgm_off.png';
+        imgs.dead.src = CP+'dead_sheet.png'; imgs.rightOut.src = CP+'right_out.png';
+
+        // 3. 시스템
+        const bgm = new Audio(CP+'bgm.mp3'); bgm.loop = true;
+        const gameOverSfx = new Audio(CP+'gameover.mp3');
+        let volumeSteps = 4; bgm.volume = volumeSteps / 8; gameOverSfx.volume = bgm.volume;
+
+        let isPaused = false; let isClear = false; let isFullyExited = false; let isGameOver = false;
+        let shakeAmount = 0; let stageFrameCount = 0;
+        const TOTAL_STAGE_TIME = 180 * 60; 
+
+        const TRAP_HEIGHT = 80; const background = { wallX: 0, wallSpeed: 2, ceilingX: 0, ceilingSpeed: 8, trapX: 0 };
+        const player = {
+            x: 350, y: 100, drawWidth: 125, drawHeight: 125,
+            hitboxWidth: 50, hitboxHeight: 90, hitboxOffsetX: 25, hitboxOffsetY: 15,
+            vy: 0, gravity: 0.4, thrust: -1.2, isPressing: false,
+            state: 'FALLING', currentFrame: 0, tickCount: 0, ticksPerFrame: 5, animDir: 1,
+            frames: { RISING: 6, FALLING: 6, DEFLECT: 3, DEAD: 6 },
+            ceilingStunTimer: 0, jingi: savedMaxJingi, maxJingi: savedMaxJingi, jingiRecoverTick: 0
+        };
+
+        const ui = {
+            optBtn: { x: 20, y: 800, w: 70, h: 70 },
+            jingiBar: { x: 30, y: 30, segW: 20, segH: 20, gap: 5, color: '#00ffcc' },
+            volBar: { x: 700, y: 405, w: 320, h: 30, gap: 5 },
+            soundIcon: { x: 580, y: 380, size: 80 }
+        };
+
+        let jumpEffects = []; let hitEffects = []; let obstacles = []; let obstacleTrails = []; let envParticles = [];
+
+        function initGame() {
+            isPaused = false; isClear = false; isGameOver = false; isFullyExited = false;
+            stageFrameCount = 0; shakeAmount = 0;
+            player.x = 350; player.y = 100; player.vy = 0; player.jingi = player.maxJingi;
+            player.state = 'FALLING'; player.currentFrame = 0; obstacles = []; 
+            obstacleTrails = []; envParticles = [];
+            if(volumeSteps > 0) { bgm.currentTime = 0; bgm.play(); }
+        }
+
+        function createJumpEffect(px, py, pw, ph) { jumpEffects.push({ x: px + (pw/2)-65-15, y: py+ph-65-19, size: 130, currentFrame: 0, totalFrames: 6, tickCount: 0, ticksPerFrame: 3 }); }
+        function createHitEffect(x, y) { hitEffects.push({ x: x, y: y - 50, size: 100, currentFrame: 0, totalFrames: 5, tickCount: 0, ticksPerFrame: 2 }); }
+        function createEnvBurst(x, y, isCeiling) {
+            if (envParticles.length > 200) return;
+            for (let i = 0; i < 12; i++) { envParticles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 8, vy: isCeiling ? (Math.random() * 5 + 2) : (Math.random() * -5 - 2), size: Math.random() * 3 + 2, color: '#ffffff', life: 1.0, decay: Math.random() * 0.05 + 0.03 }); }
+            if (!isGameOver && !isClear) shakeAmount = 15; 
+            if (player.jingi > 0 && !isClear) player.jingi--;
+        }
+        function createTrail(x, y, type) { if (obstacleTrails.length > 300) return; obstacleTrails.push({ x: x, y: y, alpha: 0.6, size: Math.random() * 4, color: (type === 'SPEAR') ? '#ffffff' : '#aaccff', speedX: Math.random() * 2, life: 1.0 }); }
+        
+        function spawnObstacle() {
+            if (isClear) return;
+            let progress = stageFrameCount / TOTAL_STAGE_TIME; 
+            // ★ 정수의 살기 위한 하향 조정 반영!
+            let currentSpawnProb = 0.03 + (0.04 * progress);
+            if (Math.random() < currentSpawnProb) {
+                const types = ['AXE', 'SPEAR', 'SWORD']; const selectedType = types[Math.floor(Math.random() * types.length)];
+                let obsData = { x: canvas.width, angle: 0, isDeflected: false, vx: 0, vy: 0, type: selectedType, rotationSpeed: 0.18, size: 70 };
+                switch(selectedType) {
+                    case 'AXE': obsData.size = 60; obsData.speed = 7 + Math.random() * 3; obsData.y = canvas.height - TRAP_HEIGHT - 400; obsData.vy = -6 - Math.random() * 3; obsData.img = imgs.axe; break;
+                    case 'SPEAR': obsData.size = 90; obsData.speed = 12 + Math.random() * 4; obsData.y = Math.random() * (canvas.height - TRAP_HEIGHT - 150); obsData.img = imgs.spear; break;
+                    case 'SWORD': obsData.size = 70; obsData.speed = 10 + Math.random() * 3; obsData.y = player.y + (player.drawHeight / 2) - 35; obsData.img = imgs.sword; break;
+                } obstacles.push(obsData);
+            }
+        }
+
+        // 입력 처리 (중복 방지 등 유지)
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect(); const mx = e.clientX - rect.left; const my = e.clientY - rect.top; const cX = canvas.width/2; const cY = canvas.height/2;
+            if (isGameOver) { if (mx >= cX - 100 && mx <= cX + 100 && my >= cY + 80 && my <= cY + 140) initGame(); return; }
+            if (isPaused) {
+                if (mx >= ui.soundIcon.x && mx <= ui.soundIcon.x + ui.soundIcon.size && my >= ui.soundIcon.y && my <= ui.soundIcon.y + ui.soundIcon.size) { if (volumeSteps > 0) { volumeSteps = 0; bgm.pause(); } else { volumeSteps = 4; bgm.volume = volumeSteps / 8; bgm.play().catch(() => {}); } gameOverSfx.volume = bgm.volume; return; }
+                if (mx >= ui.volBar.x && mx <= ui.volBar.x + ui.volBar.w && my >= ui.volBar.y && my <= ui.volBar.y + ui.volBar.h) { volumeSteps = Math.ceil((mx - ui.volBar.x) / (ui.volBar.w / 8)); bgm.volume = volumeSteps / 8; gameOverSfx.volume = bgm.volume; if (volumeSteps > 0) bgm.play().catch(() => {}); else bgm.pause(); return; }
+                if (mx >= cX - 100 && mx <= cX + 100 && my >= cY + 80 && my <= cY + 140) { isPaused = false; return; } return;
+            }
+            if (mx >= ui.optBtn.x && mx <= ui.optBtn.x + ui.optBtn.w && my >= ui.optBtn.y && my <= ui.optBtn.y + ui.optBtn.h) { isPaused = true; player.isPressing = false; return; }
+            if (!isGameOver && !isClear && player.ceilingStunTimer <= 0) { player.isPressing = true; if(volumeSteps > 0) bgm.play().catch(() => {}); }
+        });
+        window.addEventListener('mouseup', () => { player.isPressing = false; });
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !isGameOver && !isClear) isPaused = !isPaused; });
+
+        function update() {
+            if (isPaused) return;
+            if (player.jingi <= 0 && !isGameOver) {
+                isGameOver = true; shakeAmount = 0; bgm.pause(); gameOverSfx.play();
+                player.state = 'DEAD'; player.currentFrame = 0;
+            }
+            if (isGameOver) {
+                const deadStopY = canvas.height - (TRAP_HEIGHT / 2) - (player.drawHeight / 2);
+                if (player.y < deadStopY) { player.vy += 0.5; player.y += player.vy; } else { player.y = deadStopY; player.vy = 0; }
+                player.tickCount++; if (player.tickCount > player.ticksPerFrame) { player.tickCount = 0; if (player.currentFrame < player.frames.DEAD - 1) player.currentFrame++; }
+                return;
+            }
+            if (isClear) {
+                if (!isFullyExited) {
+                    player.state = 'CLEAR_EXIT'; player.x += 12;
+                    if (player.x > canvas.width) {
+                        isFullyExited = true;
+                        localStorage.setItem('maxJingi', player.maxJingi);
+                        localStorage.setItem('jingiRecoverThreshold', savedRecoverThreshold);
+                        setTimeout(() => { window.location.href = 'rest_area_3.html'; }, 2000);
+                    }
+                }
+                return; 
+            }
+            stageFrameCount++;
+            if (stageFrameCount >= TOTAL_STAGE_TIME) { isClear = true; bgm.pause(); }
+
+            if (player.jingi < player.maxJingi) { 
+                player.jingiRecoverTick++; 
+                if (player.jingiRecoverTick >= savedRecoverThreshold) { player.jingi++; player.jingiRecoverTick = 0; } 
+            }
+
+            background.wallX -= background.wallSpeed; if (background.wallX <= -2560) background.wallX = 0;
+            background.ceilingX -= background.ceilingSpeed; if (background.ceilingX <= -2560) background.ceilingX = 0;
+            background.trapX -= 6; if (background.trapX <= -canvas.width) background.trapX = 0;
+            if (player.ceilingStunTimer > 0) { player.ceilingStunTimer--; player.isPressing = false; }
+            if (player.isPressing) player.vy += player.thrust; player.vy += player.gravity; player.y += player.vy;
+            if (player.y < 40) { if (player.ceilingStunTimer <= 0) createEnvBurst(player.x + player.drawWidth / 2, 40, true); player.y = 40; player.vy = 0.5; player.ceilingStunTimer = 10; }
+            const trapLimit = canvas.height - TRAP_HEIGHT;
+            if (player.y + player.drawHeight > trapLimit && player.vy >= 0) { createEnvBurst(player.x + player.drawWidth / 2, trapLimit, false); player.vy = -10; player.state = 'RISING'; player.currentFrame = 0; player.tickCount = 0; player.animDir = 1; createJumpEffect(player.x, player.y, player.drawWidth, player.drawHeight); }
+            spawnObstacle();
+            
+            const phX = player.x + player.hitboxOffsetX; const phY = player.y + player.hitboxOffsetY;
+            // ★ 장애물 충돌 로직 수선 (중괄호 정렬 완료)
+            obstacles.forEach((obs) => {
+                if (!obs.isDeflected) {
+                    obs.x -= obs.speed; 
+                    // ★ 도끼 중력 0.11 적용
+                    if (obs.type === 'AXE') { obs.y += obs.vy; obs.vy += 0.11; obs.angle -= 0.18; }
+                    if (obs.type === 'SPEAR' || obs.type === 'SWORD') { createTrail(obs.x + 10, obs.y + obs.size/2, obs.type); }
+                    
+                    const oCX = obs.x + obs.size / 2; const oCY = obs.y + obs.size / 2;
+                    const isHit = (phX < oCX + 20 && phX + 50 > oCX - 20 && phY < oCY + 20 && phY + 90 > oCY - 20);
+                    
+                    if (isHit) {
+                        if (player.state !== 'DEFLECT') {
+                            // --- 첫 번째 반격 성공 ---
+                            if (player.jingi > 0) player.jingi--;
+                            obs.isDeflected = true;
+                            obs.vx = 10 + Math.random() * 5;
+                            obs.vy = -15 - Math.random() * 5;
+                            obs.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * 0.4;
+                            createHitEffect(oCX, oCY);
+                            player.state = 'DEFLECT';
+                            player.currentFrame = 0;
+                            player.tickCount = 0;
+                        } else { 
+                            // --- 반격 동작 중 추가 피격 (정수의 요청!) ---
+                            if (player.jingi > 0) {
+                                player.jingi--; 
+                                createEnvBurst(oCX, oCY, false); 
+                                obs.isDeflected = true; 
+                                obs.vx = 5 + Math.random() * 5;
+                                obs.vy = 5 + Math.random() * 5; 
+                                obs.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * 0.4;
+                            }
+                        }
+                    }
+                } else { 
+                    // [2] 이미 튕겨나간 무기들의 이동 로직
+                    obs.x += obs.vx; obs.y += obs.vy; obs.vy += 0.8; obs.angle += obs.rotationSpeed; 
+                }
+            });
+
+            if (shakeAmount > 0) shakeAmount -= 0.8;
+            for (let i = envParticles.length - 1; i >= 0; i--) { let p = envParticles[i]; p.x += p.vx; p.y += p.vy; p.life -= p.decay; if (p.life <= 0) envParticles.splice(i, 1); }
+            for (let i = obstacleTrails.length - 1; i >= 0; i--) { let p = obstacleTrails[i]; p.x += p.speedX; p.life -= 0.15; if (p.life <= 0) obstacleTrails.splice(i, 1); }
+            for (let i = obstacles.length - 1; i >= 0; i--) { const o = obstacles[i]; if (o.x < -150 || o.x > canvas.width + 150 || o.y > canvas.height + 150) { obstacles.splice(i, 1); } }
+
+            if (player.state !== 'DEFLECT' && player.state !== 'CLEAR_EXIT' && player.state !== 'DEAD') { 
+                let newState = (player.vy < 0) ? 'RISING' : 'FALLING'; 
+                if (player.state !== newState) { if (newState === 'RISING') createJumpEffect(player.x, player.y, player.drawWidth, player.drawHeight); player.state = newState; player.currentFrame = 0; player.tickCount = 0; player.animDir = 1; } 
+            }
+
+            // 애니메이션 로직 (상승 고정 & 점멸 방지)
+            player.tickCount++;
+            const total = player.frames[player.state] || 6; 
+            if (player.tickCount > player.ticksPerFrame) {
+                player.tickCount = 0;
+                if (player.state === 'FALLING') { 
+                    player.currentFrame += player.animDir; 
+                    if (player.currentFrame >= total - 1 || player.currentFrame <= 0) player.animDir *= -1; 
+                    player.currentFrame = Math.max(0, Math.min(total - 1, player.currentFrame)); 
+                } else if (player.state === 'RISING') {
+                    if (player.currentFrame < total - 1) player.currentFrame++;
+                } else { 
+                    player.currentFrame++; 
+                    if (player.currentFrame >= total) { 
+                        if (player.state === 'DEFLECT') player.state = (player.vy < 0) ? 'RISING' : 'FALLING'; 
+                        player.currentFrame = 0; 
+                    } 
+                }
+            }
+            [jumpEffects, hitEffects].forEach(arr => { for (let i = arr.length - 1; i >= 0; i--) { let eff = arr[i]; eff.tickCount++; if (eff.tickCount > eff.ticksPerFrame) { eff.tickCount = 0; eff.currentFrame++; if (eff.currentFrame >= eff.totalFrames) arr.splice(i, 1); } } });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            if (shakeAmount > 0) ctx.translate(Math.random() * shakeAmount - shakeAmount / 2, Math.random() * shakeAmount - shakeAmount / 2);
+            if (imgs.wall.complete) { ctx.drawImage(imgs.wall, background.wallX, canvas.height - 850, 2560, 850); ctx.drawImage(imgs.wall, background.wallX + 2560, canvas.height - 850, 2560, 850); }
+            obstacleTrails.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill(); }); ctx.globalAlpha = 1.0;
+            envParticles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); }); ctx.globalAlpha = 1.0;
+            jumpEffects.forEach(eff => { if (imgs.jumpEff.complete) ctx.drawImage(imgs.jumpEff, eff.currentFrame * 256, 0, 256, 256, eff.x, eff.y, eff.size, eff.size); });
+            if (player.state === 'CLEAR_EXIT') { if (imgs.rightOut.complete) ctx.drawImage(imgs.rightOut, player.x, player.y, player.drawWidth, player.drawHeight); }
+            else { let curS = imgs[player.state.toLowerCase()]; if (curS && curS.complete) ctx.drawImage(curS, player.currentFrame * 256, 0, 256, 256, player.x, player.y, player.drawWidth, player.drawHeight); }
+            obstacles.forEach(obs => { ctx.save(); ctx.translate(obs.x + obs.size/2, obs.y + obs.size/2); if (obs.type === 'AXE' || obs.isDeflected) ctx.rotate(obs.angle); if (obs.img.complete) ctx.drawImage(obs.img, -obs.size/2, -obs.size/2, obs.size, obs.size); ctx.restore(); });
+            hitEffects.forEach(eff => { if (imgs.hitEff.complete) ctx.drawImage(imgs.hitEff, eff.currentFrame * 256, 0, 256, 256, eff.x, eff.y, eff.size, eff.size); });
+            if (imgs.trap.complete) { ctx.drawImage(imgs.trap, background.trapX, canvas.height - TRAP_HEIGHT, canvas.width, TRAP_HEIGHT); ctx.drawImage(imgs.trap, background.trapX + canvas.width, canvas.height - TRAP_HEIGHT, canvas.width, TRAP_HEIGHT); }
+            if (imgs.ceiling.complete) { ctx.drawImage(imgs.ceiling, background.ceilingX, 0, 2560, 80); ctx.drawImage(imgs.ceiling, background.ceilingX + 2560, 0, 2560, 80); }
+            ctx.restore();
+
+            // UI 테두리 굵기 초기화
+            const jb = ui.jingiBar;
+            ctx.lineWidth = 2; 
+            for (let i = 0; i < player.maxJingi; i++) {
+                ctx.fillStyle = (i < player.jingi) ? jb.color : 'rgba(255, 255, 255, 0.1)';
+                ctx.strokeStyle = (i < player.jingi) ? 'white' : 'rgba(255, 255, 255, 0.2)';
+                ctx.fillRect(jb.x + i * (jb.segW + jb.gap), jb.y, jb.segW, jb.segH); ctx.strokeRect(jb.x + i * (jb.segW + jb.gap), jb.y, jb.segW, jb.segH);
+            }
+            const barW = (jb.segW * player.maxJingi + jb.gap * (player.maxJingi - 1));
+            ctx.fillStyle = 'orange'; ctx.fillRect(jb.x, jb.y + jb.segH + 12, barW * (stageFrameCount / TOTAL_STAGE_TIME), 6);
+            if (imgs.optionBtn.complete) ctx.drawImage(imgs.optionBtn, ui.optBtn.x, ui.optBtn.y, ui.optBtn.w, ui.optBtn.h);
+
+            if (isGameOver) {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white'; ctx.font = '110px "Dokdo"'; ctx.textAlign = 'center'; ctx.fillText('난관 돌파 실패', canvas.width/2, canvas.height/2 - 20);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(canvas.width/2 - 100, canvas.height/2 + 80, 200, 60);
+                ctx.fillStyle = 'white'; ctx.font = '40px "Dokdo"'; ctx.textBaseline = 'middle'; ctx.fillText('재도전', canvas.width/2, canvas.height/2 + 112); ctx.textBaseline = 'alphabetic';
+            }
+            if (isClear && isFullyExited) {
+                ctx.fillStyle = 'rgba(0, 255, 0, 0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white'; ctx.font = '110px "Dokdo"'; ctx.textAlign = 'center'; ctx.fillText('제2관문 돌파!', canvas.width/2, canvas.height/2);
+            }
+            if (isPaused) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                const cX = canvas.width/2; const cY = canvas.height/2;
+                ctx.fillStyle = '#2d1b0d'; ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 8;
+                ctx.strokeRect(cX - 300, cY - 200, 600, 400); ctx.fillRect(cX - 300, cY - 200, 600, 400);
+                const sImg = (volumeSteps === 0) ? imgs.bgmOff : imgs.bgmOn;
+                if (sImg.complete) ctx.drawImage(sImg, ui.soundIcon.x, ui.soundIcon.y, ui.soundIcon.size, ui.soundIcon.size);
+                const vStepW = (ui.volBar.w / 8) - ui.volBar.gap;
+                for (let i = 0; i < 8; i++) { ctx.fillStyle = (i < volumeSteps) ? '#f1c40f' : '#1a1008'; ctx.fillRect(ui.volBar.x + i * (vStepW + ui.volBar.gap), ui.volBar.y, vStepW, ui.volBar.h); }
+                ctx.fillStyle = '#5d4037'; ctx.fillRect(cX - 100, cY + 80, 200, 60);
+                ctx.fillStyle = 'white'; ctx.font = '40px "Dokdo"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('도전 지속', cX, cY + 112); ctx.textBaseline = 'alphabetic';
+            }
+            update(); requestAnimationFrame(draw);
+        }
+        draw();
+    </script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>무혼 비동: 휴식과 깨달음 (UI 통일판)</title>
+    <style>
+        @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        canvas { background: #0a0a0a; border: 5px solid #5d4037; cursor: pointer; }
+        #cutsceneVideo { position: absolute; width: 1600px; height: 900px; display: none; object-fit: cover; }
+    </style>
+</head>
+<body>
+    <video id="cutsceneVideo" src="assets/rest_stage_1/cutscene.mp4"></video>
+    <canvas id="restCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('restCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('cutsceneVideo');
+        canvas.width = 1600; canvas.height = 900;
+
+        // 1. 에셋 및 상태 관리
+        const imgs = {
+            introBGs: [new Image(), new Image(), new Image()],
+            rewardBG: new Image(),
+            resultBG: new Image()
+        };
+
+        imgs.introBGs[0].src = 'assets/rest_stage_1/intro_bg1.png';
+        imgs.introBGs[1].src = 'assets/rest_stage_1/intro_bg2.png';
+        imgs.introBGs[2].src = 'assets/rest_stage_1/intro_bg3.png';
+        imgs.rewardBG.src = 'assets/rest_stage_1/reward_bg.png';
+        imgs.resultBG.src = 'assets/rest_stage_1/result_bg.png';
+
+        let scene = 'INTRO'; // INTRO, VIDEO, REWARD_TALK, CHOICE, RESULT
+        let dialogueIndex = 0;
+        let resultMessage = "";
+        let mouseX = 0;
+        let mouseY = 0;
+
+        const introTalk = [
+            "난관을 돌파하자, 첫번째 무혼 비동이 나왔다.",
+            "무혼의 원정이 허공에서 빛나고 있다.",
+            "가까이 다가가자 무혼의 원정이 공명하기 시작했다."
+        ];
+
+        const rewardTalk = [
+            "무혼의 원정이 흡수되었다.",
+            "진기에 변화가 생긴걸 느끼고, 차분히 내부를 관조해 보았다."
+        ];
+
+        // 2. 마우스 및 클릭 이벤트
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (scene === 'INTRO') {
+                dialogueIndex++;
+                if (dialogueIndex >= introTalk.length) startVideo();
+            } else if (scene === 'REWARD_TALK') {
+                dialogueIndex++;
+                if (dialogueIndex >= rewardTalk.length) scene = 'CHOICE';
+            } else if (scene === 'CHOICE') {
+                // 버튼 클릭 판정
+                if (mouseY >= 450 && mouseY <= 550) {
+                    if (mouseX >= 400 && mouseX <= 750) selectReward('CAPACITY');
+                    else if (mouseX >= 850 && mouseX <= 1200) selectReward('SPEED');
+                }
+            } else if (scene === 'RESULT') {
+                window.location.href = 'stage_2.html';
+            }
+        });
+
+        function startVideo() {
+            scene = 'VIDEO';
+            video.style.display = 'block';
+            video.play();
+            video.onended = () => {
+                video.style.display = 'none';
+                scene = 'REWARD_TALK';
+                dialogueIndex = 0;
+            };
+        }
+
+        function selectReward(type) {
+            let currentMax = parseInt(localStorage.getItem('maxJingi')) || 8;
+            let currentSpeed = parseInt(localStorage.getItem('jingiRecoverThreshold')) || 180;
+
+            if (type === 'CAPACITY') {
+                localStorage.setItem('maxJingi', currentMax + 1);
+                resultMessage = "진기의 그릇이 넓어져 있었다.";
+            } else if (type === 'SPEED') {
+                localStorage.setItem('jingiRecoverThreshold', Math.max(60, currentSpeed - 30));
+                resultMessage = "진기의 순환이 빨라져 있었다.";
+            }
+            scene = 'RESULT';
+        }
+
+        // 3. 렌더링 루프
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (scene === 'INTRO') {
+                let curBG = imgs.introBGs[dialogueIndex];
+                if (curBG && curBG.complete) ctx.drawImage(curBG, 0, 0, 1600, 900);
+                drawDialogue(introTalk[dialogueIndex]);
+
+            } else if (scene === 'REWARD_TALK' || scene === 'CHOICE') {
+                if (imgs.rewardBG.complete) ctx.drawImage(imgs.rewardBG, 0, 0, 1600, 900);
+                if (scene === 'REWARD_TALK') drawDialogue(rewardTalk[dialogueIndex]);
+                else drawChoiceButtons();
+
+            } else if (scene === 'RESULT') {
+                if (imgs.resultBG.complete) ctx.drawImage(imgs.resultBG, 0, 0, 1600, 900);
+                // ★ 결과 메시지 창을 하단 대화창 위치로 이동
+                drawDialogue(resultMessage + "\n\n (다음 난관으로 이동)");
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        // 공통 대화창 함수
+        function drawDialogue(text) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(100, 700, 1400, 150);            
+            ctx.fillStyle = 'white'; ctx.font = '50px "Dokdo"'; ctx.textAlign = 'left';
+            ctx.fillText(text, 150, 785);
+            ctx.font = '20px Arial'; ctx.textAlign = 'right';
+            ctx.fillText("▶", 1450, 830);
+            ctx.lineWidth = 1;
+        }
+
+        // ★ 보상 선택 버튼 그리기 (마우스 오버 효과 추가)
+        function drawChoiceButtons() {
+            ctx.fillStyle = 'white'; ctx.font = '80px "Dokdo"'; ctx.textAlign = 'center';
+            ctx.fillText("진기를 관조해본 결과..", 800, 300);
+            
+            // 버튼 1: 진기 총량
+            const isHover1 = (mouseX >= 400 && mouseX <= 750 && mouseY >= 450 && mouseY <= 550);
+            // ★ 마우스가 올라가면 조금 더 진한 반투명 검정(0.8), 평소엔 연한 반투명 검정(0.5)
+            ctx.fillStyle = isHover1 ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.5)'; 
+            ctx.fillRect(400, 450, 350, 100);            
+                        
+            ctx.fillStyle = isHover1 ? '#fc2828' : 'white'; 
+            ctx.font = '40px "Dokdo"'; ctx.fillText("진기 총량 증가", 575, 510);
+            
+            // 버튼 2: 회복 속도
+            const isHover2 = (mouseX >= 850 && mouseX <= 1200 && mouseY >= 450 && mouseY <= 550);
+            ctx.fillStyle = isHover2 ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(850, 450, 350, 100);            
+                   
+            ctx.fillStyle = isHover2 ? '#fc2828' : 'white';
+            ctx.font = '40px "Dokdo"'; ctx.fillText("진기 회복 속도 증가", 1025, 510);
+        }
+
+        draw();
+    </script>
+</body>
+</html>
