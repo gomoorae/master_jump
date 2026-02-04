@@ -91,7 +91,7 @@
             if (isClear) return;
             let progress = stageFrameCount / TOTAL_STAGE_TIME; 
             // ★ 정수의 살기 위한 하향 조정 반영!
-            let currentSpawnProb = 0.03 + (0.04 * progress);
+            let currentSpawnProb = 0.06 + (0.08 * progress);
             if (Math.random() < currentSpawnProb) {
                 const types = ['AXE', 'SPEAR', 'SWORD']; const selectedType = types[Math.floor(Math.random() * types.length)];
                 let obsData = { x: canvas.width, angle: 0, isDeflected: false, vx: 0, vy: 0, type: selectedType, rotationSpeed: 0.18, size: 70 };

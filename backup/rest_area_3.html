@@ -68,7 +68,7 @@
                     playVideo('VIDEO_REWARD', VIDEO_PATH.REWARD); // ★ 보상 컷신 재생
                 }
             } else if (scene === 'RESULT') {
-                window.location.href = 'stage_4.html';
+                window.location.href = 'stage_final.html';
             }
         });
 
@@ -94,8 +94,8 @@
         };
 
         function applyFinalReward() {
-            localStorage.setItem('maxJingi', 14);
-            localStorage.setItem('jingiRecoverThreshold', 90);
+            localStorage.setItem('maxJingi', 15);
+            localStorage.setItem('jingiRecoverThreshold', 30);
             resultMessage = "무혼의 진기를 완벽히 체득하여 진기의 그릇과 회복 속도가 최고치에 달했다.";
         }
 

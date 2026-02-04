@@ -1,0 +1,27 @@
+{
+  "name": "master_jump",
+  "version": "1.0.0",
+  "description": "무혼 비동: 전설의 시작",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --windows portable:ia32"
+  },
+  "build": {
+    "appId": "com.jungsu.masterjump",
+    "productName": "MasterJump_Muhon_Portable",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "portable",
+      "icon": "assets/common/right_out.png"
+    }
+  },
+  "author": "정수",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}

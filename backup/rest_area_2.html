@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>정수협객: 휴식과 깨달음 (UI 통일판)</title>
+    <title>무혼 비동: 휴식과 깨달음 (UI 통일판)</title>
     <style>
         @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
@@ -91,7 +91,7 @@
             let currentSpeed = parseInt(localStorage.getItem('jingiRecoverThreshold')) || 180;
 
             if (type === 'CAPACITY') {
-                localStorage.setItem('maxJingi', currentMax + 1);
+                localStorage.setItem('maxJingi', currentMax + 2);
                 resultMessage = "진기의 그릇이 넓어져 있었다.";
             } else if (type === 'SPEED') {
                 localStorage.setItem('jingiRecoverThreshold', Math.max(60, currentSpeed - 30));
