@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>무혼 비동: 시련의 시작</title>
+    
+    <!-- PWA 메타 태그 -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="무혼 비동">
+    <meta name="theme-color" content="#000000">
+    <meta name="description" content="모든 난관을 극복한 자만이 무혼을 얻을 것이다">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- 아이콘 설정 -->
+    <link rel="icon" type="image/png" href="assets/common/right_out.png">
+    <link rel="apple-touch-icon" href="assets/common/right_out.png">
     <style>
         @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
         body { 
@@ -108,9 +123,60 @@
         }
         
         @keyframes blink { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+        
+        /* 세로 모드 안내 레이어 */
+        #rotateOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.98);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            color: #fff;
+            font-family: 'Dokdo', cursive;
+        }
+        
+        #rotateOverlay.show {
+            display: flex;
+        }
+        
+        #rotateIcon {
+            font-size: 120px;
+            margin-bottom: 30px;
+            animation: rotateAnim 2s ease-in-out infinite;
+        }
+        
+        #rotateText {
+            font-size: 60px;
+            color: #00ffcc;
+            text-shadow: 0 0 20px #00ffcc;
+        }
+        
+        @keyframes rotateAnim {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+        
+        /* 가로 모드에서만 게임 표시 */
+        @media (orientation: portrait) {
+            #rotateOverlay {
+                display: flex !important;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- 세로 모드 안내 레이어 -->
+    <div id="rotateOverlay">
+        <div id="rotateIcon">📱➜🎮</div>
+        <div id="rotateText">기기를 가로로 돌려주세요</div>
+    </div>
+    
     <div id="gameWrapper">
         <div id="titleMenu" class="screen active">
             <div id="startBtn">무혼 비동에 들어간다</div>
@@ -206,6 +272,70 @@
         }
 
         addTouchAndClick(msgOverlay, showNextMessage);
+        
+        // ===== PWA 기능 =====
+        
+        // 1. 서비스 워커 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then((registration) => {
+                        console.log('[PWA] Service Worker 등록 성공:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.warn('[PWA] Service Worker 등록 실패:', error);
+                    });
+            });
+        }
+        
+        // 2. 화면 방향 강제 고정 (가로 모드)
+        async function lockOrientation() {
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    await screen.orientation.lock('landscape');
+                    console.log('[PWA] 화면 방향 고정: 가로 모드');
+                }
+            } catch (error) {
+                console.warn('[PWA] 화면 방향 고정 실패:', error);
+                // CSS 미디어 쿼리로 폴백 처리
+            }
+        }
+        
+        // 페이지 로드 시 방향 고정 시도
+        document.addEventListener('DOMContentLoaded', () => {
+            lockOrientation();
+        });
+        
+        // 전체 화면 모드 진입 시 방향 고정 재시도
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                lockOrientation();
+            }
+        });
+        
+        // 3. 세로 모드 감지 및 안내 레이어 표시
+        const rotateOverlay = document.getElementById('rotateOverlay');
+        
+        function checkOrientation() {
+            const isPortrait = window.innerHeight > window.innerWidth;
+            if (isPortrait) {
+                rotateOverlay.classList.add('show');
+            } else {
+                rotateOverlay.classList.remove('show');
+            }
+        }
+        
+        window.addEventListener('resize', checkOrientation);
+        window.addEventListener('orientationchange', checkOrientation);
+        checkOrientation(); // 초기 확인
+        
+        // 4. PWA 설치 프롬프트 (선택사항)
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            console.log('[PWA] 설치 가능');
+        });
     </script>
 </body>
 </html>

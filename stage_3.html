@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>무혼 비경: 제3 난관</title>
+    
+    <!-- PWA 메타 태그 -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <link rel="manifest" href="manifest.json">
     <style>
         @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
         body { 
@@ -83,9 +90,55 @@
             0%, 100% { opacity: 0.3; }
             50% { opacity: 1; }
         }
+        
+        /* 세로 모드 안내 레이어 */
+        #rotateOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.98);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            color: #fff;
+            font-family: 'Dokdo', cursive;
+        }
+        
+        #rotateIcon {
+            font-size: 120px;
+            margin-bottom: 30px;
+            animation: rotateAnim 2s ease-in-out infinite;
+        }
+        
+        #rotateText {
+            font-size: 60px;
+            color: #00ffcc;
+            text-shadow: 0 0 20px #00ffcc;
+        }
+        
+        @keyframes rotateAnim {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+        
+        @media (orientation: portrait) {
+            #rotateOverlay {
+                display: flex !important;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- 세로 모드 안내 레이어 -->
+    <div id="rotateOverlay">
+        <div id="rotateIcon">📱➜🎮</div>
+        <div id="rotateText">기기를 가로로 돌려주세요</div>
+    </div>
+    
     <div id="gameContainer">
         <canvas id="gameCanvas"></canvas>
         
@@ -451,6 +504,32 @@
             requestAnimationFrame(gameLoop);
         }
         gameLoop();
+        
+        // ===== PWA 화면 방향 제어 =====
+        async function lockOrientation() {
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    await screen.orientation.lock('landscape');
+                }
+            } catch (error) {
+                console.warn('[PWA] 화면 방향 고정 실패:', error);
+            }
+        }
+        
+        lockOrientation();
+        
+        const rotateOverlay = document.getElementById('rotateOverlay');
+        function checkOrientation() {
+            const isPortrait = window.innerHeight > window.innerWidth;
+            rotateOverlay.style.display = isPortrait ? 'flex' : 'none';
+        }
+        
+        window.addEventListener('resize', checkOrientation);
+        window.addEventListener('orientationchange', () => {
+            checkOrientation();
+            lockOrientation();
+        });
+        checkOrientation();
     </script>
 </body>
 </html>
