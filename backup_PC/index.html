@@ -123,16 +123,7 @@
             localStorage.setItem('jingiRecoverThreshold', 180);
         }
 
-        // 터치 및 클릭 모두 지원하는 함수
-        function addTouchAndClick(element, handler) {
-            element.addEventListener('click', handler);
-            element.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                handler(e);
-            });
-        }
-
-        addTouchAndClick(document.getElementById('startBtn'), () => {
+        document.getElementById('startBtn').addEventListener('click', () => {
             initNewGame();
             titleMenu.classList.remove('active');
             cutsceneScreen.classList.add('active');
@@ -154,7 +145,7 @@
             }
         }
 
-        addTouchAndClick(msgOverlay, showNextMessage);
+        msgOverlay.addEventListener('click', showNextMessage);
     </script>
 </body>
 </html>

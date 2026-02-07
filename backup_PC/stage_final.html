@@ -103,16 +103,9 @@
             }
         }
 
-        // 입력 처리 (터치 및 마우스 모두 지원)
-        function handlePointerDown(e) {
-            const rect = canvas.getBoundingClientRect();
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            const mx = clientX - rect.left;
-            const my = clientY - rect.top;
-            const cX = canvas.width/2;
-            const cY = canvas.height/2;
-            
+        // 입력 처리 (중복 방지 등 유지)
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect(); const mx = e.clientX - rect.left; const my = e.clientY - rect.top; const cX = canvas.width/2; const cY = canvas.height/2;
             if (isGameOver) { if (mx >= cX - 100 && mx <= cX + 100 && my >= cY + 80 && my <= cY + 140) initGame(); return; }
             if (isPaused) {
                 if (mx >= ui.soundIcon.x && mx <= ui.soundIcon.x + ui.soundIcon.size && my >= ui.soundIcon.y && my <= ui.soundIcon.y + ui.soundIcon.size) { if (volumeSteps > 0) { volumeSteps = 0; bgm.pause(); } else { volumeSteps = 4; bgm.volume = volumeSteps / 8; bgm.play().catch(() => {}); } gameOverSfx.volume = bgm.volume; return; }
@@ -121,23 +114,8 @@
             }
             if (mx >= ui.optBtn.x && mx <= ui.optBtn.x + ui.optBtn.w && my >= ui.optBtn.y && my <= ui.optBtn.y + ui.optBtn.h) { isPaused = true; player.isPressing = false; return; }
             if (!isGameOver && !isClear && player.ceilingStunTimer <= 0) { player.isPressing = true; if(volumeSteps > 0) bgm.play().catch(() => {}); }
-        }
-        
-        function handlePointerUp() {
-            player.isPressing = false;
-        }
-        
-        canvas.addEventListener('mousedown', handlePointerDown);
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            handlePointerDown(e);
         });
-        
-        window.addEventListener('mouseup', handlePointerUp);
-        window.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            handlePointerUp();
-        });
+        window.addEventListener('mouseup', () => { player.isPressing = false; });
         window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !isGameOver && !isClear) isPaused = !isPaused; });
 
         function update() {

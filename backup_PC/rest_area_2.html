@@ -50,24 +50,14 @@
             "진기에 변화가 생긴걸 느끼고, 차분히 내부를 관조해 보았다."
         ];
 
-        // 2. 마우스 및 터치 이벤트
-        function updatePointerPosition(e) {
+        // 2. 마우스 및 클릭 이벤트
+        canvas.addEventListener('mousemove', (e) => {
             const rect = canvas.getBoundingClientRect();
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            mouseX = clientX - rect.left;
-            mouseY = clientY - rect.top;
-        }
-        
-        canvas.addEventListener('mousemove', updatePointerPosition);
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            updatePointerPosition(e);
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
         });
 
-        function handlePointerDown(e) {
-            updatePointerPosition(e);
-            
+        canvas.addEventListener('mousedown', (e) => {
             if (scene === 'INTRO') {
                 dialogueIndex++;
                 if (dialogueIndex >= introTalk.length) startVideo();
@@ -83,12 +73,6 @@
             } else if (scene === 'RESULT') {
                 window.location.href = 'stage_3.html';
             }
-        }
-        
-        canvas.addEventListener('mousedown', handlePointerDown);
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            handlePointerDown(e);
         });
 
         function startVideo() {

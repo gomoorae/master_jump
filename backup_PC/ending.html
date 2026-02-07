@@ -98,17 +98,11 @@
         const credits = document.getElementById('credits');
         const restartBtn = document.getElementById('restartBtn');
 
-        // ★ 1. 오버레이 클릭 및 터치 시 영상 재생 시작
-        function startEndingVideo() {
+        // ★ 1. 오버레이 클릭 시 영상 재생 시작
+        overlay.addEventListener('click', () => {
             overlay.style.display = 'none'; // 오버레이 숨기기
             video.style.display = 'block'; // 영상 보이기
             video.play();                  // 영상 재생
-        }
-        
-        overlay.addEventListener('click', startEndingVideo);
-        overlay.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startEndingVideo();
         });
 
         // 2. 영상 종료 시 크레딧 시작

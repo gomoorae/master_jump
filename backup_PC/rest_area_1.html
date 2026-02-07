@@ -11,7 +11,7 @@
     </style>
 </head>
 <body>
-    <video id="cutsceneVideo" src="assets/rest_stage_2/cutscene.mp4"></video>
+    <video id="cutsceneVideo" src="assets/rest_stage_1/cutscene.mp4"></video>
     <canvas id="restCanvas"></canvas>
 
     <script>
@@ -27,11 +27,11 @@
             resultBG: new Image()
         };
 
-        imgs.introBGs[0].src = 'assets/rest_stage_2/intro_bg1.png';
-        imgs.introBGs[1].src = 'assets/rest_stage_2/intro_bg2.png';
-        imgs.introBGs[2].src = 'assets/rest_stage_2/intro_bg3.png';
-        imgs.rewardBG.src = 'assets/rest_stage_2/reward_bg.png';
-        imgs.resultBG.src = 'assets/rest_stage_2/result_bg.png';
+        imgs.introBGs[0].src = 'assets/rest_stage_1/intro_bg1.png';
+        imgs.introBGs[1].src = 'assets/rest_stage_1/intro_bg2.png';
+        imgs.introBGs[2].src = 'assets/rest_stage_1/intro_bg3.png';
+        imgs.rewardBG.src = 'assets/rest_stage_1/reward_bg.png';
+        imgs.resultBG.src = 'assets/rest_stage_1/result_bg.png';
 
         let scene = 'INTRO'; // INTRO, VIDEO, REWARD_TALK, CHOICE, RESULT
         let dialogueIndex = 0;
@@ -40,7 +40,7 @@
         let mouseY = 0;
 
         const introTalk = [
-            "난관을 돌파하자, 두번째 무혼 비동이 나왔다.",
+            "난관을 돌파하자, 첫번째 무혼 비동이 나왔다.",
             "무혼의 원정이 허공에서 빛나고 있다.",
             "가까이 다가가자 무혼의 원정이 공명하기 시작했다."
         ];
@@ -50,24 +50,14 @@
             "진기에 변화가 생긴걸 느끼고, 차분히 내부를 관조해 보았다."
         ];
 
-        // 2. 마우스 및 터치 이벤트
-        function updatePointerPosition(e) {
+        // 2. 마우스 및 클릭 이벤트
+        canvas.addEventListener('mousemove', (e) => {
             const rect = canvas.getBoundingClientRect();
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            mouseX = clientX - rect.left;
-            mouseY = clientY - rect.top;
-        }
-        
-        canvas.addEventListener('mousemove', updatePointerPosition);
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            updatePointerPosition(e);
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
         });
 
-        function handlePointerDown(e) {
-            updatePointerPosition(e);
-            
+        canvas.addEventListener('mousedown', (e) => {
             if (scene === 'INTRO') {
                 dialogueIndex++;
                 if (dialogueIndex >= introTalk.length) startVideo();
@@ -81,14 +71,8 @@
                     else if (mouseX >= 850 && mouseX <= 1200) selectReward('SPEED');
                 }
             } else if (scene === 'RESULT') {
-                window.location.href = 'stage_3.html';
+                window.location.href = 'stage_2.html';
             }
-        }
-        
-        canvas.addEventListener('mousedown', handlePointerDown);
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            handlePointerDown(e);
         });
 
         function startVideo() {
@@ -107,7 +91,7 @@
             let currentSpeed = parseInt(localStorage.getItem('jingiRecoverThreshold')) || 180;
 
             if (type === 'CAPACITY') {
-                localStorage.setItem('maxJingi', currentMax + 2);
+                localStorage.setItem('maxJingi', currentMax + 1);
                 resultMessage = "진기의 그릇이 넓어져 있었다.";
             } else if (type === 'SPEED') {
                 localStorage.setItem('jingiRecoverThreshold', Math.max(60, currentSpeed - 30));

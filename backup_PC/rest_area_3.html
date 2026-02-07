@@ -55,8 +55,8 @@
             "모든 무혼의 원정이 하나로 합쳐지며, 내부에서 무혼의 힘이 느껴진다."
         ];
 
-        // 2. 클릭 및 터치 이벤트 제어
-        function handlePointerDown(e) {
+        // 2. 클릭 이벤트 제어
+        canvas.addEventListener('mousedown', (e) => {
             if (scene === 'INTRO') {
                 dialogueIndex++;
                 if (dialogueIndex >= introTalk.length) {
@@ -70,12 +70,6 @@
             } else if (scene === 'RESULT') {
                 window.location.href = 'stage_final.html';
             }
-        }
-        
-        canvas.addEventListener('mousedown', handlePointerDown);
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            handlePointerDown(e);
         });
 
         // 비디오 재생 공통 함수
