@@ -1,5 +1,10 @@
 // 무혼 비동 Service Worker
-const CACHE_NAME = 'muhon-bidong-v1.0.0';
+// ⚠️ 업데이트 시 이 버전을 반드시 변경하세요! (예: v1.0.0 -> v1.0.1)
+const VERSION = 'v1.0.1';
+const CACHE_NAME = `muhon-bidong-${VERSION}`;
+
+console.log(`[Service Worker ${VERSION}] 초기화`);
+
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -83,8 +88,33 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch 이벤트: 캐시 우선 전략
+// Fetch 이벤트: 스마트 캐싱 전략
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  
+  // HTML 파일은 네트워크 우선 (항상 최신 버전 확인)
+  if (event.request.destination === 'document' || 
+      url.pathname.endsWith('.html') ||
+      url.pathname === '/' || 
+      url.pathname.endsWith('/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // 네트워크에서 가져온 HTML을 캐시에 저장
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+          return response;
+        })
+        .catch(() => {
+          // 오프라인이면 캐시된 HTML 사용
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+  
   // 동영상과 큰 파일은 네트워크 우선
   if (event.request.url.includes('.mp4') || 
       event.request.url.includes('.webm') ||
@@ -97,12 +127,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 나머지는 캐시 우선
+  // 나머지 리소스(이미지, 폰트, 오디오)는 캐시 우선
   event.respondWith(
     caches.match(event.request)
       .then((cachedResponse) => {
         if (cachedResponse) {
           // 캐시에 있으면 캐시 반환 (빠른 로딩)
+          // 동시에 백그라운드에서 업데이트 확인
+          fetch(event.request).then((response) => {
+            if (response && response.status === 200) {
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(event.request, response);
+              });
+            }
+          }).catch(() => {});
+          
           return cachedResponse;
         }
         
@@ -124,7 +163,6 @@ self.addEventListener('fetch', (event) => {
           })
           .catch((err) => {
             console.error('[Service Worker] Fetch 실패:', err);
-            // 오프라인 폴백 (선택사항)
             return new Response('오프라인 상태입니다.', {
               headers: { 'Content-Type': 'text/plain; charset=utf-8' }
             });

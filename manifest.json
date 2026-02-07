@@ -1,8 +1,9 @@
 {
   "name": "무혼 비동: 시련의 시작",
   "short_name": "무혼 비동",
+  "version": "1.0.1",
   "description": "모든 난관을 극복한 자만이 무혼을 얻을 것이다",
-  "start_url": "./index.html",
+  "start_url": "./index.html?v=1.0.1",
   "display": "fullscreen",
   "orientation": "landscape",
   "theme_color": "#000000",
