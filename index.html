@@ -2,13 +2,42 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>무혼 비동: 시련의 시작</title>
     <style>
         @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Dokdo', cursive; }
+        body { 
+            margin: 0; 
+            background: #000; 
+            overflow: hidden; 
+            font-family: 'Dokdo', cursive;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* 16:9 비율 유지 + 자동 스케일링 래퍼 */
+        #gameWrapper {
+            position: relative;
+            width: 100vw;
+            height: 56.25vw; /* 16:9 비율 (9/16 = 56.25%) */
+            max-height: 100vh;
+            max-width: 177.78vh; /* 16:9 비율 (16/9 = 177.78%) */
+            background: #000;
+        }
         
         /* 공통 전체 화면 설정 */
-        .screen { width: 1600px; height: 900px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; }
+        .screen { 
+            width: 1600px; 
+            height: 900px; 
+            position: absolute; 
+            left: 0; 
+            top: 0; 
+            transform-origin: top left;
+            display: none;
+        }
         .active { display: block; }
 
         /* 1. 타이틀 메뉴 화면 */
@@ -82,25 +111,47 @@
     </style>
 </head>
 <body>
+    <div id="gameWrapper">
+        <div id="titleMenu" class="screen active">
+            <div id="startBtn">무혼 비동에 들어간다</div>
+        </div>
 
-    <div id="titleMenu" class="screen active">
-        <div id="startBtn">무혼 비동에 들어간다</div>
-    </div>
+        <div id="cutsceneVideo" class="screen">
+            <video id="introVideo">
+                <source src="assets/title/cutscene_intro.mp4" type="video/mp4">
+            </video>
+        </div>
 
-    <div id="cutsceneVideo" class="screen">
-        <video id="introVideo">
-            <source src="assets/title/cutscene_intro.mp4" type="video/mp4">
-        </video>
-    </div>
-
-    <div id="msgOverlay" class="screen">
-        <div class="msg-box">
-            <div id="msgContent" class="msg-text"></div>
-            <div class="next-hint">->></div>
+        <div id="msgOverlay" class="screen">
+            <div class="msg-box">
+                <div id="msgContent" class="msg-text"></div>
+                <div class="next-hint">->></div>
+            </div>
         </div>
     </div>
 
     <script>
+        // 반응형 스케일링 함수
+        function scaleGame() {
+            const wrapper = document.getElementById('gameWrapper');
+            const screens = document.querySelectorAll('.screen');
+            const baseWidth = 1600;
+            const baseHeight = 900;
+            
+            const scaleX = wrapper.offsetWidth / baseWidth;
+            const scaleY = wrapper.offsetHeight / baseHeight;
+            const scale = Math.min(scaleX, scaleY);
+            
+            screens.forEach(screen => {
+                screen.style.transform = `scale(${scale})`;
+            });
+        }
+        
+        // 페이지 로드 및 리사이즈 시 스케일링 적용
+        window.addEventListener('load', scaleGame);
+        window.addEventListener('resize', scaleGame);
+        
+    
         const titleMenu = document.getElementById('titleMenu');
         const cutsceneScreen = document.getElementById('cutsceneVideo');
         const introVideo = document.getElementById('introVideo');

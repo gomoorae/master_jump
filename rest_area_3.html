@@ -2,17 +2,60 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>무혼 비동: 최종 각성 (완성본)</title>
     <style>
         @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
-        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        canvas { background: #0a0a0a; border: 5px solid #5d4037; cursor: pointer; }
-        #cutsceneVideo { position: absolute; width: 1600px; height: 900px; display: none; object-fit: cover; }
+        body { 
+            margin: 0; 
+            background: #000; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            width: 100vw;
+            height: 100vh; 
+            overflow: hidden; 
+        }
+        
+        /* 16:9 비율 유지 컨테이너 */
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 56.25vw; /* 16:9 */
+            max-height: 100vh;
+            max-width: 177.78vh; /* 16:9 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+        }
+        
+        canvas { 
+            background: #0a0a0a; 
+            border: 5px solid #5d4037; 
+            cursor: pointer;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        }
+        
+        #cutsceneVideo { 
+            position: absolute; 
+            display: none; 
+            object-fit: cover;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        }
     </style>
 </head>
 <body>
-    <video id="cutsceneVideo"></video>
-    <canvas id="restCanvas"></canvas>
+    <div id="gameContainer">
+        <video id="cutsceneVideo"></video>
+        <canvas id="restCanvas"></canvas>
+    </div>
 
     <script>
         const canvas = document.getElementById('restCanvas');
