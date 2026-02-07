@@ -131,6 +131,82 @@
                 display: flex !important;
             }
         }
+        
+        /* 뒤로가기 확인 팝업 */
+        #backConfirmOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            font-family: 'Dokdo', cursive;
+        }
+        
+        #backConfirmOverlay.show {
+            display: flex;
+        }
+        
+        #backConfirmBox {
+            background: linear-gradient(145deg, #1a1a1a, #2d2d2d);
+            border: 5px solid #00ffcc;
+            border-radius: 20px;
+            padding: 50px 60px;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(0, 255, 204, 0.5);
+        }
+        
+        #backConfirmMessage {
+            color: #fff;
+            font-size: 70px;
+            margin-bottom: 50px;
+            text-shadow: 0 0 20px #fff;
+        }
+        
+        #backConfirmButtons {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+        }
+        
+        .backConfirmBtn {
+            padding: 20px 50px;
+            font-size: 50px;
+            border: 3px solid;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Dokdo', cursive;
+            background: rgba(0, 0, 0, 0.5);
+        }
+        
+        #continueBtn {
+            color: #00ffcc;
+            border-color: #00ffcc;
+        }
+        
+        #continueBtn:hover {
+            background: #00ffcc;
+            color: #000;
+            transform: scale(1.05);
+            box-shadow: 0 0 30px #00ffcc;
+        }
+        
+        #exitBtn {
+            color: #ff4444;
+            border-color: #ff4444;
+        }
+        
+        #exitBtn:hover {
+            background: #ff4444;
+            color: #fff;
+            transform: scale(1.05);
+            box-shadow: 0 0 30px #ff4444;
+        }
     </style>
 </head>
 <body>
@@ -138,6 +214,17 @@
     <div id="rotateOverlay">
         <div id="rotateIcon">📱➜🎮</div>
         <div id="rotateText">기기를 가로로 돌려주세요</div>
+    </div>
+    
+    <!-- 뒤로가기 확인 팝업 -->
+    <div id="backConfirmOverlay">
+        <div id="backConfirmBox">
+            <div id="backConfirmMessage">게임을 종료하시겠습니까?</div>
+            <div id="backConfirmButtons">
+                <button id="continueBtn" class="backConfirmBtn">계속하기</button>
+                <button id="exitBtn" class="backConfirmBtn">나가기</button>
+            </div>
+        </div>
     </div>
     
     <div id="gameContainer">
@@ -541,6 +628,73 @@
             lockOrientation(); // 방향 변경 시 다시 고정 시도
         });
         checkOrientation(); // 초기 확인
+        
+        // ===== 하드웨어 뒤로가기 버튼 감지 및 방지 =====
+        
+        const backConfirmOverlay = document.getElementById('backConfirmOverlay');
+        const continueBtn = document.getElementById('continueBtn');
+        const exitBtn = document.getElementById('exitBtn');
+        let isBackConfirmShowing = false;
+        let wasPausedBeforeBack = false;
+        
+        // 페이지 로드 시 히스토리 엔트리 추가 (뒤로가기 감지용)
+        history.pushState({ page: 'game' }, '', location.href);
+        
+        // 뒤로가기 버튼 감지
+        window.addEventListener('popstate', (event) => {
+            if (!isBackConfirmShowing) {
+                // 뒤로가기가 발생하면 다시 히스토리를 푸시하여 페이지 유지
+                history.pushState({ page: 'game' }, '', location.href);
+                
+                // 현재 게임 일시정지 상태 저장
+                wasPausedBeforeBack = isPaused;
+                
+                // 게임 일시정지
+                if (!isPaused) {
+                    isPaused = true;
+                }
+                
+                // 확인 팝업 표시
+                isBackConfirmShowing = true;
+                backConfirmOverlay.classList.add('show');
+            }
+        });
+        
+        // "계속하기" 버튼
+        function handleContinue() {
+            backConfirmOverlay.classList.remove('show');
+            isBackConfirmShowing = false;
+            
+            // 뒤로가기 전에 일시정지 상태가 아니었으면 게임 재개
+            if (!wasPausedBeforeBack) {
+                isPaused = false;
+            }
+        }
+        
+        continueBtn.addEventListener('click', handleContinue);
+        continueBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            handleContinue();
+        });
+        
+        // "나가기" 버튼
+        function handleExit() {
+            backConfirmOverlay.classList.remove('show');
+            isBackConfirmShowing = false;
+            
+            // 실제로 타이틀 화면으로 이동
+            // 히스토리를 제거하고 이동
+            history.go(-1); // 가상 엔트리 제거
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 10);
+        }
+        
+        exitBtn.addEventListener('click', handleExit);
+        exitBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            handleExit();
+        });
     </script>
 </body>
 </html>
