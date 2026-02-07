@@ -82,7 +82,12 @@
 
         let isPaused = false; let isClear = false; let isFullyExited = false; let isGameOver = false;
         let shakeAmount = 0; let stageFrameCount = 0;
-        const TOTAL_STAGE_TIME = 180 * 60; 
+        const TOTAL_STAGE_TIME = 180 * 60;
+        
+        // deltaTime 관리 (프레임 레이트 독립적인 움직임)
+        let lastTime = performance.now();
+        const TARGET_FPS = 60;
+        const FRAME_TIME = 1000 / TARGET_FPS;
 
         const TRAP_HEIGHT = 80; const background = { wallX: 0, wallSpeed: 2, ceilingX: 0, ceilingSpeed: 8, trapX: 0 };
         const player = {
