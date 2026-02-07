@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>무혼 비경: 마지막 난관</title>
+    <title>무혼 비경: 최종 난관</title>
     <style>
         @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
         body { 
@@ -70,7 +70,7 @@
         imgs.jumpEff.src = CP+'jump_effect_sheet.png'; imgs.axe.src = CP+'axe.png';
         imgs.spear.src = CP+'spear.png'; imgs.sword.src = CP+'sword.png'; 
         imgs.trap.src = CP+'trap_asset.png'; imgs.deflect.src = CP+'deflect_sheet.png';
-        imgs.hitEff.src = CP+'hit_effect_sheet.png'; imgs.wall.src = CP+'bg_wall_s4.png';
+        imgs.hitEff.src = CP+'hit_effect_sheet.png'; imgs.wall.src = CP+'bg_wall_s3.png';
         imgs.ceiling.src = CP+'bg_ceiling.png'; imgs.optionBtn.src = CP+'option_btn.png';
         imgs.bgmOn.src = CP+'bgm_on.png'; imgs.bgmOff.src = CP+'bgm_off.png';
         imgs.dead.src = CP+'dead_sheet.png'; imgs.rightOut.src = CP+'right_out.png';
@@ -82,7 +82,12 @@
 
         let isPaused = false; let isClear = false; let isFullyExited = false; let isGameOver = false;
         let shakeAmount = 0; let stageFrameCount = 0;
-        const TOTAL_STAGE_TIME = 180 * 60; 
+        const TOTAL_STAGE_TIME = 180 * 60;
+        
+        // deltaTime 관리 (프레임 레이트 독립적인 움직임)
+        let lastTime = performance.now();
+        const TARGET_FPS = 60;
+        const FRAME_TIME = 1000 / TARGET_FPS;
 
         const TRAP_HEIGHT = 80; const background = { wallX: 0, wallSpeed: 2, ceilingX: 0, ceilingSpeed: 8, trapX: 0 };
         const player = {
@@ -126,7 +131,7 @@
             if (isClear) return;
             let progress = stageFrameCount / TOTAL_STAGE_TIME; 
             // ★ 정수의 살기 위한 하향 조정 반영!
-            let currentSpawnProb = 0.06 + (0.08 * progress);
+            let currentSpawnProb = 0.035 + (0.055 * progress);
             if (Math.random() < currentSpawnProb) {
                 const types = ['AXE', 'SPEAR', 'SWORD']; const selectedType = types[Math.floor(Math.random() * types.length)];
                 let obsData = { x: canvas.width, angle: 0, isDeflected: false, vx: 0, vy: 0, type: selectedType, rotationSpeed: 0.18, size: 70 };
@@ -180,7 +185,7 @@
         });
         window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !isGameOver && !isClear) isPaused = !isPaused; });
 
-        function update() {
+        function update(deltaTime = 1) {
             if (isPaused) return;
             if (player.jingi <= 0 && !isGameOver) {
                 isGameOver = true; shakeAmount = 0; bgm.pause(); gameOverSfx.play();
@@ -188,13 +193,13 @@
             }
             if (isGameOver) {
                 const deadStopY = canvas.height - (TRAP_HEIGHT / 2) - (player.drawHeight / 2);
-                if (player.y < deadStopY) { player.vy += 0.5; player.y += player.vy; } else { player.y = deadStopY; player.vy = 0; }
-                player.tickCount++; if (player.tickCount > player.ticksPerFrame) { player.tickCount = 0; if (player.currentFrame < player.frames.DEAD - 1) player.currentFrame++; }
+                if (player.y < deadStopY) { player.vy += 0.5 * deltaTime; player.y += player.vy * deltaTime; } else { player.y = deadStopY; player.vy = 0; }
+                player.tickCount += deltaTime; if (player.tickCount > player.ticksPerFrame) { player.tickCount = 0; if (player.currentFrame < player.frames.DEAD - 1) player.currentFrame++; }
                 return;
             }
             if (isClear) {
                 if (!isFullyExited) {
-                    player.state = 'CLEAR_EXIT'; player.x += 12;
+                    player.state = 'CLEAR_EXIT'; player.x += 12 * deltaTime;
                     if (player.x > canvas.width) {
                         isFullyExited = true;
                         localStorage.setItem('maxJingi', player.maxJingi);
@@ -204,19 +209,19 @@
                 }
                 return; 
             }
-            stageFrameCount++;
+            stageFrameCount += deltaTime;
             if (stageFrameCount >= TOTAL_STAGE_TIME) { isClear = true; bgm.pause(); }
 
             if (player.jingi < player.maxJingi) { 
-                player.jingiRecoverTick++; 
+                player.jingiRecoverTick += deltaTime; 
                 if (player.jingiRecoverTick >= savedRecoverThreshold) { player.jingi++; player.jingiRecoverTick = 0; } 
             }
 
-            background.wallX -= background.wallSpeed; if (background.wallX <= -2560) background.wallX = 0;
-            background.ceilingX -= background.ceilingSpeed; if (background.ceilingX <= -2560) background.ceilingX = 0;
-            background.trapX -= 6; if (background.trapX <= -canvas.width) background.trapX = 0;
-            if (player.ceilingStunTimer > 0) { player.ceilingStunTimer--; player.isPressing = false; }
-            if (player.isPressing) player.vy += player.thrust; player.vy += player.gravity; player.y += player.vy;
+            background.wallX -= background.wallSpeed * deltaTime; if (background.wallX <= -2560) background.wallX = 0;
+            background.ceilingX -= background.ceilingSpeed * deltaTime; if (background.ceilingX <= -2560) background.ceilingX = 0;
+            background.trapX -= 6 * deltaTime; if (background.trapX <= -canvas.width) background.trapX = 0;
+            if (player.ceilingStunTimer > 0) { player.ceilingStunTimer -= deltaTime; player.isPressing = false; }
+            if (player.isPressing) player.vy += player.thrust * deltaTime; player.vy += player.gravity * deltaTime; player.y += player.vy * deltaTime;
             if (player.y < 40) { if (player.ceilingStunTimer <= 0) createEnvBurst(player.x + player.drawWidth / 2, 40, true); player.y = 40; player.vy = 0.5; player.ceilingStunTimer = 10; }
             const trapLimit = canvas.height - TRAP_HEIGHT;
             if (player.y + player.drawHeight > trapLimit && player.vy >= 0) { createEnvBurst(player.x + player.drawWidth / 2, trapLimit, false); player.vy = -10; player.state = 'RISING'; player.currentFrame = 0; player.tickCount = 0; player.animDir = 1; createJumpEffect(player.x, player.y, player.drawWidth, player.drawHeight); }
@@ -226,9 +231,9 @@
             // ★ 장애물 충돌 로직 수선 (중괄호 정렬 완료)
             obstacles.forEach((obs) => {
                 if (!obs.isDeflected) {
-                    obs.x -= obs.speed; 
+                    obs.x -= obs.speed * deltaTime; 
                     // ★ 도끼 중력 0.11 적용
-                    if (obs.type === 'AXE') { obs.y += obs.vy; obs.vy += 0.11; obs.angle -= 0.18; }
+                    if (obs.type === 'AXE') { obs.y += obs.vy * deltaTime; obs.vy += 0.11 * deltaTime; obs.angle -= 0.18 * deltaTime; }
                     if (obs.type === 'SPEAR' || obs.type === 'SWORD') { createTrail(obs.x + 10, obs.y + obs.size/2, obs.type); }
                     
                     const oCX = obs.x + obs.size / 2; const oCY = obs.y + obs.size / 2;
@@ -264,9 +269,9 @@
                 }
             });
 
-            if (shakeAmount > 0) shakeAmount -= 0.8;
-            for (let i = envParticles.length - 1; i >= 0; i--) { let p = envParticles[i]; p.x += p.vx; p.y += p.vy; p.life -= p.decay; if (p.life <= 0) envParticles.splice(i, 1); }
-            for (let i = obstacleTrails.length - 1; i >= 0; i--) { let p = obstacleTrails[i]; p.x += p.speedX; p.life -= 0.15; if (p.life <= 0) obstacleTrails.splice(i, 1); }
+            if (shakeAmount > 0) shakeAmount -= 0.8 * deltaTime;
+            for (let i = envParticles.length - 1; i >= 0; i--) { let p = envParticles[i]; p.x += p.vx * deltaTime; p.y += p.vy * deltaTime; p.life -= p.decay * deltaTime; if (p.life <= 0) envParticles.splice(i, 1); }
+            for (let i = obstacleTrails.length - 1; i >= 0; i--) { let p = obstacleTrails[i]; p.x += p.speedX * deltaTime; p.life -= 0.15 * deltaTime; if (p.life <= 0) obstacleTrails.splice(i, 1); }
             for (let i = obstacles.length - 1; i >= 0; i--) { const o = obstacles[i]; if (o.x < -150 || o.x > canvas.width + 150 || o.y > canvas.height + 150) { obstacles.splice(i, 1); } }
 
             if (player.state !== 'DEFLECT' && player.state !== 'CLEAR_EXIT' && player.state !== 'DEAD') { 
@@ -275,7 +280,7 @@
             }
 
             // 애니메이션 로직 (상승 고정 & 점멸 방지)
-            player.tickCount++;
+            player.tickCount += deltaTime;
             const total = player.frames[player.state] || 6; 
             if (player.tickCount > player.ticksPerFrame) {
                 player.tickCount = 0;
@@ -293,10 +298,24 @@
                     } 
                 }
             }
-            [jumpEffects, hitEffects].forEach(arr => { for (let i = arr.length - 1; i >= 0; i--) { let eff = arr[i]; eff.tickCount++; if (eff.tickCount > eff.ticksPerFrame) { eff.tickCount = 0; eff.currentFrame++; if (eff.currentFrame >= eff.totalFrames) arr.splice(i, 1); } } });
+            [jumpEffects, hitEffects].forEach(arr => { for (let i = arr.length - 1; i >= 0; i--) { let eff = arr[i]; eff.tickCount += deltaTime; if (eff.tickCount > eff.ticksPerFrame) { eff.tickCount = 0; eff.currentFrame++; if (eff.currentFrame >= eff.totalFrames) arr.splice(i, 1); } } });
         }
 
-        function draw() {
+        function gameLoop(currentTime) {
+            // 첫 프레임이거나 currentTime이 없으면 초기화
+            if (!currentTime || currentTime - lastTime > 1000) {
+                lastTime = currentTime || performance.now();
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            
+            // deltaTime 계산 (밀리초를 프레임 배율로 변환)
+            const deltaTime = (currentTime - lastTime) / FRAME_TIME;
+            lastTime = currentTime;
+            
+            // deltaTime이 너무 크면 제한 (탭 전환 등으로 인한 큰 점프 방지)
+            const clampedDelta = Math.min(deltaTime, 3);
+            
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
             if (shakeAmount > 0) ctx.translate(Math.random() * shakeAmount - shakeAmount / 2, Math.random() * shakeAmount - shakeAmount / 2);
@@ -346,9 +365,10 @@
                 ctx.fillStyle = '#5d4037'; ctx.fillRect(cX - 100, cY + 80, 200, 60);
                 ctx.fillStyle = 'white'; ctx.font = '40px "Dokdo"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('도전 지속', cX, cY + 112); ctx.textBaseline = 'alphabetic';
             }
-            update(); requestAnimationFrame(draw);
+            update(clampedDelta); 
+            requestAnimationFrame(gameLoop);
         }
-        draw();
+        gameLoop();
     </script>
 </body>
 </html>

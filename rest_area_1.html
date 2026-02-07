@@ -89,7 +89,7 @@
         ];
 
         const rewardTalk = [
-            "무혼의 원정이 흡수되었다.",
+            "첫번쨰 무혼의 원정이 흡수되었다.",
             "진기에 변화가 생긴걸 느끼고, 차분히 내부를 관조해 보았다."
         ];
 
@@ -154,7 +154,7 @@
             let currentSpeed = parseInt(localStorage.getItem('jingiRecoverThreshold')) || 180;
 
             if (type === 'CAPACITY') {
-                localStorage.setItem('maxJingi', currentMax + 1);
+                localStorage.setItem('maxJingi', currentMax + 2);
                 resultMessage = "진기의 그릇이 넓어져 있었다.";
             } else if (type === 'SPEED') {
                 localStorage.setItem('jingiRecoverThreshold', Math.max(60, currentSpeed - 30));

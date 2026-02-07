@@ -40,11 +40,60 @@
             width: auto;
             height: auto;
         }
+        
+        /* 시작 오버레이 */
+        #startOverlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            cursor: pointer;
+            font-family: 'Dokdo', cursive;
+        }
+        
+        #startOverlay.hidden {
+            display: none;
+        }
+        
+        #startMessage {
+            color: #00ffcc;
+            font-size: 120px;
+            text-shadow: 0 0 30px #00ffcc, 0 0 60px #00ffcc;
+            margin-bottom: 40px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        #startHint {
+            color: #888;
+            font-size: 45px;
+            animation: blink 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
     <div id="gameContainer">
         <canvas id="gameCanvas"></canvas>
+        
+        <!-- 시작 오버레이 -->
+        <div id="startOverlay">
+            <div id="startMessage">세 번째 난관 시작</div>
+            <div id="startHint">화면을 터치하세요...</div>
+        </div>
     </div>
 
     <script>
@@ -81,6 +130,8 @@
         let volumeSteps = 4; bgm.volume = volumeSteps / 8; gameOverSfx.volume = bgm.volume;
 
         let isPaused = false; let isClear = false; let isFullyExited = false; let isGameOver = false;
+        let gameStarted = false; // 게임 시작 여부
+        let isFirstLoad = true; // 첫 로드인지 확인
         let shakeAmount = 0; let stageFrameCount = 0;
         const TOTAL_STAGE_TIME = 180 * 60;
         
@@ -110,12 +161,42 @@
 
         function initGame() {
             isPaused = false; isClear = false; isGameOver = false; isFullyExited = false;
+            
+            // ★ 첫 로드가 아니면 (재도전이면) 바로 시작
+            if (!isFirstLoad) {
+                gameStarted = true;
+                startOverlay.classList.add('hidden');
+                if(volumeSteps > 0) { 
+                    bgm.currentTime = 0; 
+                    bgm.play().catch(() => {}); 
+                }
+            } else {
+                gameStarted = false; // 첫 로드는 대기
+            }
+            
             stageFrameCount = 0; shakeAmount = 0;
             player.x = 350; player.y = 100; player.vy = 0; player.jingi = player.maxJingi;
             player.state = 'FALLING'; player.currentFrame = 0; obstacles = []; 
             obstacleTrails = []; envParticles = [];
-            if(volumeSteps > 0) { bgm.currentTime = 0; bgm.play(); }
         }
+        
+        // 시작 오버레이 클릭/터치 이벤트
+        const startOverlay = document.getElementById('startOverlay');
+        function startGame() {
+            isFirstLoad = false; // 첫 로드 완료
+            gameStarted = true;
+            startOverlay.classList.add('hidden');
+            if(volumeSteps > 0) { 
+                bgm.currentTime = 0; 
+                bgm.play().catch(() => {}); 
+            }
+        }
+        
+        startOverlay.addEventListener('click', startGame);
+        startOverlay.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startGame();
+        });
 
         function createJumpEffect(px, py, pw, ph) { jumpEffects.push({ x: px + (pw/2)-65-15, y: py+ph-65-19, size: 130, currentFrame: 0, totalFrames: 6, tickCount: 0, ticksPerFrame: 3 }); }
         function createHitEffect(x, y) { hitEffects.push({ x: x, y: y - 50, size: 100, currentFrame: 0, totalFrames: 5, tickCount: 0, ticksPerFrame: 2 }); }
@@ -186,6 +267,7 @@
         window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !isGameOver && !isClear) isPaused = !isPaused; });
 
         function update(deltaTime = 1) {
+            if (!gameStarted) return; // 게임 시작 전에는 업데이트 안 함
             if (isPaused) return;
             if (player.jingi <= 0 && !isGameOver) {
                 isGameOver = true; shakeAmount = 0; bgm.pause(); gameOverSfx.play();

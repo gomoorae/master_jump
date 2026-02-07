@@ -2,14 +2,40 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>무혼 비동: 전설의 시작</title>
     <style>
         @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Dokdo', cursive; }
+        body { 
+            margin: 0; 
+            background: #000; 
+            overflow: hidden; 
+            font-family: 'Dokdo', cursive;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* 16:9 비율 유지 래퍼 */
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 56.25vw; /* 16:9 */
+            max-height: 100vh;
+            max-width: 177.78vh; /* 16:9 */
+            background: #000;
+        }
         
         #endingWrapper { 
-            width: 1600px; height: 900px; position: absolute; left: 50%; top: 50%; 
-            transform: translate(-50%, -50%); overflow: hidden;
+            width: 1600px; 
+            height: 900px; 
+            position: absolute; 
+            left: 0; 
+            top: 0; 
+            transform-origin: top left;
+            overflow: hidden;
             background: #000;
         }
 
@@ -66,7 +92,8 @@
     </style>
 </head>
 <body>
-    <div id="endingWrapper">
+    <div id="gameContainer">
+        <div id="endingWrapper">
         <div id="escapeOverlay">
             <div id="escapeMsg">"탈출이다!"</div>
             <div id="clickHint">...</div>
@@ -89,20 +116,46 @@
         </div>
 
         <button id="restartBtn" onclick="location.href='index.html'">무혼 비동으로 돌아가기</button>
+        </div>
     </div>
 
     <script>
+        // 반응형 스케일링 함수
+        function scaleGame() {
+            const container = document.getElementById('gameContainer');
+            const wrapper = document.getElementById('endingWrapper');
+            const baseWidth = 1600;
+            const baseHeight = 900;
+            
+            const scaleX = container.offsetWidth / baseWidth;
+            const scaleY = container.offsetHeight / baseHeight;
+            const scale = Math.min(scaleX, scaleY);
+            
+            wrapper.style.transform = `scale(${scale})`;
+        }
+        
+        // 페이지 로드 및 리사이즈 시 스케일링 적용
+        window.addEventListener('load', scaleGame);
+        window.addEventListener('resize', scaleGame);
+        
+    
         const overlay = document.getElementById('escapeOverlay');
         const video = document.getElementById('endingVideo');
         const bg = document.getElementById('endingBG');
         const credits = document.getElementById('credits');
         const restartBtn = document.getElementById('restartBtn');
 
-        // ★ 1. 오버레이 클릭 시 영상 재생 시작
-        overlay.addEventListener('click', () => {
+        // ★ 1. 오버레이 클릭 및 터치 시 영상 재생 시작
+        function startEndingVideo() {
             overlay.style.display = 'none'; // 오버레이 숨기기
             video.style.display = 'block'; // 영상 보이기
             video.play();                  // 영상 재생
+        }
+        
+        overlay.addEventListener('click', startEndingVideo);
+        overlay.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startEndingVideo();
         });
 
         // 2. 영상 종료 시 크레딧 시작
