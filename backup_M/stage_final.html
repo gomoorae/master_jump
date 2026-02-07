@@ -2,15 +2,50 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>무혼 비경: 마지막 난관</title>
     <style>
         @font-face {font-family: 'Dokdo'; src: url('assets/common/Dokdo-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
-        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        canvas { background: #0a0a0a; border: 5px solid #5d4037; box-shadow: 0 0 20px rgba(0,255,0,0.2); cursor: pointer; }
+        body { 
+            margin: 0; 
+            background: #000; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            width: 100vw;
+            height: 100vh; 
+            overflow: hidden; 
+        }
+        
+        /* 16:9 비율 유지 컨테이너 */
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 56.25vw; /* 16:9 */
+            max-height: 100vh;
+            max-width: 177.78vh; /* 16:9 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+        }
+        
+        canvas { 
+            background: #0a0a0a; 
+            border: 5px solid #5d4037; 
+            box-shadow: 0 0 20px rgba(0,255,0,0.2); 
+            cursor: pointer;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+    </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -103,9 +138,21 @@
             }
         }
 
-        // 입력 처리 (중복 방지 등 유지)
-        canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect(); const mx = e.clientX - rect.left; const my = e.clientY - rect.top; const cX = canvas.width/2; const cY = canvas.height/2;
+        // 입력 처리 (터치 및 마우스 모두 지원)
+        function handlePointerDown(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            
+            // ★ 중요: 스케일된 canvas 좌표를 실제 canvas 좌표로 변환
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mx = (clientX - rect.left) * scaleX;
+            const my = (clientY - rect.top) * scaleY;
+            
+            const cX = canvas.width/2;
+            const cY = canvas.height/2;
+            
             if (isGameOver) { if (mx >= cX - 100 && mx <= cX + 100 && my >= cY + 80 && my <= cY + 140) initGame(); return; }
             if (isPaused) {
                 if (mx >= ui.soundIcon.x && mx <= ui.soundIcon.x + ui.soundIcon.size && my >= ui.soundIcon.y && my <= ui.soundIcon.y + ui.soundIcon.size) { if (volumeSteps > 0) { volumeSteps = 0; bgm.pause(); } else { volumeSteps = 4; bgm.volume = volumeSteps / 8; bgm.play().catch(() => {}); } gameOverSfx.volume = bgm.volume; return; }
@@ -114,8 +161,23 @@
             }
             if (mx >= ui.optBtn.x && mx <= ui.optBtn.x + ui.optBtn.w && my >= ui.optBtn.y && my <= ui.optBtn.y + ui.optBtn.h) { isPaused = true; player.isPressing = false; return; }
             if (!isGameOver && !isClear && player.ceilingStunTimer <= 0) { player.isPressing = true; if(volumeSteps > 0) bgm.play().catch(() => {}); }
+        }
+        
+        function handlePointerUp() {
+            player.isPressing = false;
+        }
+        
+        canvas.addEventListener('mousedown', handlePointerDown);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handlePointerDown(e);
         });
-        window.addEventListener('mouseup', () => { player.isPressing = false; });
+        
+        window.addEventListener('mouseup', handlePointerUp);
+        window.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            handlePointerUp();
+        });
         window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !isGameOver && !isClear) isPaused = !isPaused; });
 
         function update() {

@@ -126,7 +126,7 @@
         function createTrail(x, y, type) { obstacleTrails.push({ x: x, y: y, alpha: 0.6, size: Math.random() * 4, color: (type === 'SPEAR') ? '#ffffff' : '#aaccff', speedX: Math.random() * 2, life: 1.0 }); }
         function spawnObstacle() {
             if (isClear) return;
-            let progress = stageFrameCount / TOTAL_STAGE_TIME; let currentSpawnProb = 0.01 + (0.02 * progress); 
+            let progress = stageFrameCount / TOTAL_STAGE_TIME; let currentSpawnProb = 0.01 + (0.018 * progress); 
             if (Math.random() < currentSpawnProb) {
                 const types = ['AXE', 'SPEAR', 'SWORD']; const selectedType = types[Math.floor(Math.random() * types.length)];
                 let obsData = { x: canvas.width, angle: 0, isDeflected: false, vx: 0, vy: 0, type: selectedType, rotationSpeed: 0.18, size: 70 };
