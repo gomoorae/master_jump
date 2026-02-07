@@ -1,0 +1,6 @@
+✅ stage_1.html - 완료
+✅ stage_2.html - 완료 
+🔄 stage_3.html - 진행 중
+🔄 stage_final.html - 진행 중
+
+deltaTime 변수 추가 완료, 이제 update 함수 수정 진행 중...
