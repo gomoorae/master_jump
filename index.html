@@ -270,9 +270,10 @@
         </div>
 
         <div id="cutsceneVideo" class="screen">
-            <video id="introVideo">
+            <video id="introVideo" preload="auto" playsinline>
                 <source src="assets/title/cutscene_intro.mp4" type="video/mp4">
             </video>
+            <div id="videoLoadingIndicator" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #00ffcc; font-size: 60px; font-family: 'Dokdo', cursive;">로딩 중...</div>
         </div>
 
         <div id="msgOverlay" class="screen">
@@ -310,6 +311,7 @@
         const introVideo = document.getElementById('introVideo');
         const msgOverlay = document.getElementById('msgOverlay');
         const msgContent = document.getElementById('msgContent');
+        const videoLoadingIndicator = document.getElementById('videoLoadingIndicator');
 
         const introMessages = [
             "[무혼 비동]\n모든 난관을 극복한 자만이 무혼을 얻을 것이다.",
@@ -321,11 +323,27 @@
         ];
 
         let currentMsgIndex = 0;
+        let isVideoReady = false;
 
         function initNewGame() {
             localStorage.setItem('maxJingi', 8);
             localStorage.setItem('jingiRecoverThreshold', 180);
         }
+
+        // 비디오 로딩 상태 확인
+        introVideo.addEventListener('loadeddata', () => {
+            isVideoReady = true;
+            console.log('[Video] 비디오 로드 완료');
+        });
+
+        // 비디오 로딩 에러 처리
+        introVideo.addEventListener('error', (e) => {
+            console.error('[Video] 비디오 로드 실패:', e);
+            // 비디오 로드 실패 시 메시지 화면으로 바로 이동
+            cutsceneScreen.classList.remove('active');
+            msgOverlay.classList.add('active');
+            showNextMessage();
+        });
 
         // 터치 및 클릭 모두 지원하는 함수
         function addTouchAndClick(element, handler) {
@@ -336,11 +354,54 @@
             });
         }
 
+        // 비디오 재생 함수 (에러 핸들링 포함)
+        async function playVideoSafely() {
+            try {
+                videoLoadingIndicator.style.display = 'block';
+                
+                // 비디오가 로드될 때까지 대기 (최대 5초)
+                if (!isVideoReady) {
+                    console.log('[Video] 비디오 로딩 대기 중...');
+                    await new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => {
+                            reject(new Error('Video loading timeout'));
+                        }, 5000);
+                        
+                        const checkReady = () => {
+                            if (isVideoReady || introVideo.readyState >= 3) {
+                                clearTimeout(timeout);
+                                resolve();
+                            } else {
+                                setTimeout(checkReady, 100);
+                            }
+                        };
+                        checkReady();
+                    });
+                }
+                
+                videoLoadingIndicator.style.display = 'none';
+                
+                // 비디오 재생 시도
+                await introVideo.play();
+                console.log('[Video] 비디오 재생 시작');
+                
+            } catch (error) {
+                console.error('[Video] 재생 실패:', error);
+                videoLoadingIndicator.style.display = 'none';
+                
+                // 재생 실패 시 메시지 화면으로 바로 이동
+                alert('컷신 재생에 실패했습니다. 게임을 시작합니다.');
+                cutsceneScreen.classList.remove('active');
+                msgOverlay.classList.add('active');
+                showNextMessage();
+            }
+        }
+
         addTouchAndClick(document.getElementById('startBtn'), () => {
             initNewGame();
             titleMenu.classList.remove('active');
             cutsceneScreen.classList.add('active');
-            introVideo.play();
+            playVideoSafely();
         });
 
         introVideo.onended = () => {
@@ -359,6 +420,14 @@
         }
 
         addTouchAndClick(msgOverlay, showNextMessage);
+        
+        // ===== 비디오 사전 로딩 =====
+        
+        // 페이지 로드 시 비디오 사전 로딩 시작
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('[Video] 비디오 사전 로딩 시작');
+            introVideo.load(); // 비디오 로드 명시적 호출
+        });
         
         // ===== PWA 기능 =====
         
