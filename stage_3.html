@@ -274,13 +274,18 @@
         let isPaused = false; let isClear = false; let isFullyExited = false; let isGameOver = false;
         let gameStarted = false; // 게임 시작 여부
         let isFirstLoad = true; // 첫 로드인지 확인
-        let shakeAmount = 0; let stageFrameCount = 0;
-        const TOTAL_STAGE_TIME = 180 * 60;
+        let shakeAmount = 0;
+        // 스테이지 시간: ms 기준 (브라우저/주사율 무관 동일 난이도)
+        let stageTimeMs = 0;
+        const TOTAL_STAGE_TIME_MS = 180 * 1000;  // 180초
         
-        // deltaTime 관리 (프레임 레이트 독립적인 움직임)
+        // Fixed Update (델타 타임): 렌더 FPS와 무관하게 물리/생성은 항상 60 FPS 기준으로 동작
+        // → 크롬/삼성인터넷/사파리 등 브라우저별 주사율 차이와 무관하게 동일한 난이도 보장
         let lastTime = performance.now();
+        let fixedAccumulatorMs = 0;
         const TARGET_FPS = 60;
-        const FRAME_TIME = 1000 / TARGET_FPS;
+        const FIXED_STEP_MS = 1000 / TARGET_FPS;  // ~16.67ms
+        const MAX_ACCUMULATOR_MS = FIXED_STEP_MS * 5;  // 한 프레임에 최대 5스텝 (스파이럴 방지)
 
         const TRAP_HEIGHT = 80; const background = { wallX: 0, wallSpeed: 2, ceilingX: 0, ceilingSpeed: 8, trapX: 0 };
         const player = {
@@ -316,8 +321,9 @@
                 gameStarted = false; // 첫 로드는 대기
             }
             
-            stageFrameCount = 0; shakeAmount = 0;
+            stageTimeMs = 0; shakeAmount = 0;
             player.x = 350; player.y = 100; player.vy = 0; player.jingi = player.maxJingi;
+            player.jingiRecoverTick = 0;
             player.state = 'FALLING'; player.currentFrame = 0; obstacles = []; 
             obstacleTrails = []; envParticles = [];
         }
@@ -350,12 +356,13 @@
         }
         function createTrail(x, y, type) { if (obstacleTrails.length > 300) return; obstacleTrails.push({ x: x, y: y, alpha: 0.6, size: Math.random() * 4, color: (type === 'SPEAR') ? '#ffffff' : '#aaccff', speedX: Math.random() * 2, life: 1.0 }); }
         
+        // 무기 생성: 경과 시간(ms) 기준 확률. 브라우저 주사율과 무관하게 동일한 초당 생성량.
         function spawnObstacle() {
             if (isClear) return;
-            let progress = stageFrameCount / TOTAL_STAGE_TIME; 
-            // ★ 정수의 살기 위한 하향 조정 반영!
-            let currentSpawnProb = 0.02 + (0.027 * progress);
-            if (Math.random() < currentSpawnProb) {
+            const progress = stageTimeMs / TOTAL_STAGE_TIME_MS;
+            const spawnsPerSecond = 1.2 + 1.62 * progress;  // 60fps 기준 0.02~0.047/프레임 → 초당 생성률
+            const probThisStep = 1 - Math.exp(-spawnsPerSecond * (FIXED_STEP_MS / 1000));
+            if (Math.random() < probThisStep) {
                 const types = ['AXE', 'SPEAR', 'SWORD']; const selectedType = types[Math.floor(Math.random() * types.length)];
                 let obsData = { x: canvas.width, angle: 0, isDeflected: false, vx: 0, vy: 0, type: selectedType, rotationSpeed: 0.18, size: 70 };
                 switch(selectedType) {
@@ -433,18 +440,18 @@
                 }
                 return; 
             }
-            stageFrameCount += deltaTime;
-            if (stageFrameCount >= TOTAL_STAGE_TIME) { isClear = true; bgm.pause(); }
+            stageTimeMs += FIXED_STEP_MS;
+            if (stageTimeMs >= TOTAL_STAGE_TIME_MS) { isClear = true; bgm.pause(); }
 
             if (player.jingi < player.maxJingi) { 
-                player.jingiRecoverTick += deltaTime; 
+                player.jingiRecoverTick += 1; 
                 if (player.jingiRecoverTick >= savedRecoverThreshold) { player.jingi++; player.jingiRecoverTick = 0; } 
             }
 
             background.wallX -= background.wallSpeed * deltaTime; if (background.wallX <= -2560) background.wallX = 0;
             background.ceilingX -= background.ceilingSpeed * deltaTime; if (background.ceilingX <= -2560) background.ceilingX = 0;
             background.trapX -= 6 * deltaTime; if (background.trapX <= -canvas.width) background.trapX = 0;
-            if (player.ceilingStunTimer > 0) { player.ceilingStunTimer -= deltaTime; player.isPressing = false; }
+            if (player.ceilingStunTimer > 0) { player.ceilingStunTimer -= 1; player.isPressing = false; }
             if (player.isPressing) player.vy += player.thrust * deltaTime; player.vy += player.gravity * deltaTime; player.y += player.vy * deltaTime;
             if (player.y < 40) { if (player.ceilingStunTimer <= 0) createEnvBurst(player.x + player.drawWidth / 2, 40, true); player.y = 40; player.vy = 0.5; player.ceilingStunTimer = 10; }
             const trapLimit = canvas.height - TRAP_HEIGHT;
@@ -526,19 +533,16 @@
         }
 
         function gameLoop(currentTime) {
-            // 첫 프레임이거나 currentTime이 없으면 초기화
-            if (!currentTime || currentTime - lastTime > 1000) {
-                lastTime = currentTime || performance.now();
-                requestAnimationFrame(gameLoop);
-                return;
-            }
-            
-            // deltaTime 계산 (밀리초를 프레임 배율로 변환)
-            const deltaTime = (currentTime - lastTime) / FRAME_TIME;
+            currentTime = currentTime || performance.now();
+            let deltaTimeMs = currentTime - lastTime;
             lastTime = currentTime;
-            
-            // deltaTime이 너무 크면 제한 (탭 전환 등으로 인한 큰 점프 방지)
-            const clampedDelta = Math.min(deltaTime, 3);
+            if (deltaTimeMs > 1000) deltaTimeMs = 0;
+            fixedAccumulatorMs += deltaTimeMs;
+            if (fixedAccumulatorMs > MAX_ACCUMULATOR_MS) fixedAccumulatorMs = MAX_ACCUMULATOR_MS;
+            while (fixedAccumulatorMs >= FIXED_STEP_MS) {
+                update(1);
+                fixedAccumulatorMs -= FIXED_STEP_MS;
+            }
             
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
@@ -564,7 +568,7 @@
                 ctx.fillRect(jb.x + i * (jb.segW + jb.gap), jb.y, jb.segW, jb.segH); ctx.strokeRect(jb.x + i * (jb.segW + jb.gap), jb.y, jb.segW, jb.segH);
             }
             const barW = (jb.segW * player.maxJingi + jb.gap * (player.maxJingi - 1));
-            ctx.fillStyle = 'orange'; ctx.fillRect(jb.x, jb.y + jb.segH + 12, barW * (stageFrameCount / TOTAL_STAGE_TIME), 6);
+            ctx.fillStyle = 'orange'; ctx.fillRect(jb.x, jb.y + jb.segH + 12, barW * (stageTimeMs / TOTAL_STAGE_TIME_MS), 6);
             if (imgs.optionBtn.complete) ctx.drawImage(imgs.optionBtn, ui.optBtn.x, ui.optBtn.y, ui.optBtn.w, ui.optBtn.h);
 
             if (isGameOver) {
@@ -589,7 +593,6 @@
                 ctx.fillStyle = '#5d4037'; ctx.fillRect(cX - 100, cY + 80, 200, 60);
                 ctx.fillStyle = 'white'; ctx.font = '40px "Dokdo"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('도전 지속', cX, cY + 112); ctx.textBaseline = 'alphabetic';
             }
-            update(clampedDelta); 
             requestAnimationFrame(gameLoop);
         }
         gameLoop();
