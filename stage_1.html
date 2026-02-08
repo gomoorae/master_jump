@@ -358,7 +358,7 @@
         function spawnObstacle() {
             if (isClear) return;
             const progress = stageTimeMs / TOTAL_STAGE_TIME_MS;
-            const spawnsPerSecond = 1 + 1.5 * progress;  // 60fps 기준 0.01~0.028/프레임 → 초당 생성률
+            const spawnsPerSecond = 1 + 2 * progress;  // 60fps 기준 0.01~0.028/프레임 → 초당 생성률
             const probThisStep = 1 - Math.exp(-spawnsPerSecond * (FIXED_STEP_MS / 1000));
             if (Math.random() < probThisStep) {
                 const types = ['AXE', 'SPEAR', 'SWORD']; const selectedType = types[Math.floor(Math.random() * types.length)];
